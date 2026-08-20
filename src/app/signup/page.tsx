@@ -16,7 +16,7 @@ export default function SignupPage() {
       <Container className="flex justify-center">
         <section className="w-full max-w-md" aria-labelledby="signup-title">
           <Link className="inline-flex min-h-11 items-center font-semibold tracking-tight" href="/">
-            Daehan
+            DAEHAN
           </Link>
 
           <div className="mb-8 mt-8 sm:mb-10 sm:mt-12">

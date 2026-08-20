@@ -1,7 +1,7 @@
 import { Database, FolderOpen, PanelsTopLeft } from "lucide-react";
 
 export const homeContent = {
-  brand: "Daehan",
+  brand: "DAEHAN",
   headline: "필요한 준비를\n한곳에서 끝내요",
   description:
     "프로젝트에 필요한 기술과 서비스를 연결하고 개발을 바로 시작할 수 있도록 도와드려요.",
