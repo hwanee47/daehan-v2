@@ -57,11 +57,25 @@ export async function signup(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: { name } },
   });
+
+  const isDuplicateEmail =
+    error?.code === "user_already_exists" ||
+    error?.code === "email_exists" ||
+    (data.user !== null && data.user.identities?.length === 0);
+
+  if (isDuplicateEmail) {
+    return {
+      status: "error",
+      message: "이미 가입된 이메일이에요. 로그인해 주세요.",
+      fields: { email, name },
+      errors: { email: "이미 가입된 이메일이에요." },
+    };
+  }
 
   if (error) {
     console.error("Supabase signup failed", {

@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { createClient } from "@/lib/supabase/server";
 
+import { LogoutForm } from "./logout-form";
+
 export const metadata: Metadata = {
   title: "내 프로필 | Daehan",
   description: "Daehan 계정 정보를 확인해요.",
@@ -98,6 +100,8 @@ export default async function ProfilePage() {
               </Link>
             </div>
           )}
+
+          <LogoutForm />
         </section>
       </Container>
     </main>

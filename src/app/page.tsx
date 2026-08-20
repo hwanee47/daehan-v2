@@ -8,19 +8,21 @@ import { homeContent } from "@/content/home";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
-async function getCurrentUserName() {
+import { ReferenceInformationMenu } from "./reference-information-menu";
+
+async function getCurrentUserProfile() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return null;
+    return { isAdmin: false, name: null };
   }
 
   const { data: profile, error } = await supabase
     .from("users")
-    .select("name")
+    .select("name, role")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -30,16 +32,18 @@ async function getCurrentUserName() {
     });
   }
 
-  return (
-    profile?.name ||
-    (typeof user.user_metadata.name === "string" ? user.user_metadata.name : null) ||
-    user.email?.split("@")[0] ||
-    "사용자"
-  );
+  return {
+    isAdmin: profile?.role === "admin",
+    name:
+      profile?.name ||
+      (typeof user.user_metadata.name === "string" ? user.user_metadata.name : null) ||
+      user.email?.split("@")[0] ||
+      "사용자",
+  };
 }
 
 export default async function Home() {
-  const userName = await getCurrentUserName();
+  const { isAdmin, name: userName } = await getCurrentUserProfile();
 
   return (
     <main className="min-h-screen bg-background">
@@ -57,10 +61,11 @@ export default async function Home() {
             <span className="hidden sm:inline">{homeContent.brand}</span>
           </Link>
 
-          <nav aria-label="주요 메뉴" className="justify-self-center">
+          <nav aria-label="주요 메뉴" className="flex items-center justify-self-center">
             <Link className="flex h-11 items-center rounded-xl px-3 font-semibold text-foreground transition-colors hover:bg-muted sm:px-5" href="/inspection-reports">
               검사성적서
             </Link>
+            {isAdmin ? <ReferenceInformationMenu /> : null}
           </nav>
 
           <nav aria-label="사용자 메뉴" className="flex justify-self-end text-muted-foreground">

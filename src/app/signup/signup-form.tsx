@@ -24,7 +24,10 @@ export function SignupForm() {
         </div>
         <h2 className="mt-5 text-xl font-semibold">이메일을 확인해 주세요</h2>
         <p className="mt-2 break-keep text-muted-foreground">{state.message}</p>
-        <Button className="mt-7 w-full" render={<Link href="/" />}>
+        <Button className="mt-7 w-full" render={<Link href="/login" />}>
+          로그인하기
+        </Button>
+        <Button className="mt-3 w-full" render={<Link href="/" />} variant="secondary">
           홈으로 돌아가기
         </Button>
       </div>
