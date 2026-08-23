@@ -17,7 +17,7 @@ async function getCurrentUserProfile() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { isAdmin: false, name: null };
+    return { isAdmin: false, isAuthenticated: false, name: null };
   }
 
   const { data: profile, error } = await supabase
@@ -34,6 +34,7 @@ async function getCurrentUserProfile() {
 
   return {
     isAdmin: profile?.role === "admin",
+    isAuthenticated: true,
     name:
       profile?.name ||
       (typeof user.user_metadata.name === "string" ? user.user_metadata.name : null) ||
@@ -43,7 +44,7 @@ async function getCurrentUserProfile() {
 }
 
 export default async function Home() {
-  const { isAdmin, name: userName } = await getCurrentUserProfile();
+  const { isAdmin, isAuthenticated, name: userName } = await getCurrentUserProfile();
 
   return (
     <main className="min-h-screen bg-background">
@@ -61,14 +62,16 @@ export default async function Home() {
             <span className="hidden sm:inline">{homeContent.brand}</span>
           </Link>
 
-          <nav aria-label="주요 메뉴" className="flex items-center justify-self-center">
-            <Link className="flex h-11 items-center rounded-xl px-3 font-semibold text-foreground transition-colors hover:bg-muted sm:px-5" href="/inspection-reports">
-              검사성적서
-            </Link>
-            {isAdmin ? <ReferenceInformationMenu /> : null}
-          </nav>
+          {isAuthenticated ? (
+            <nav aria-label="주요 메뉴" className="flex items-center justify-self-center">
+              <Link className="flex h-11 items-center rounded-xl px-3 font-semibold text-foreground transition-colors hover:bg-muted sm:px-5" href="/inspection-reports">
+                검사성적서
+              </Link>
+              {isAdmin ? <ReferenceInformationMenu /> : null}
+            </nav>
+          ) : null}
 
-          <nav aria-label="사용자 메뉴" className="flex justify-self-end text-muted-foreground">
+          <nav aria-label="사용자 메뉴" className="col-start-3 flex justify-self-end text-muted-foreground">
             {userName ? (
               <Link aria-label={`${userName}님의 프로필 보기`} className="flex h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2 font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3" href="/profile">
                 <UserRound className="size-6" aria-hidden="true" />
