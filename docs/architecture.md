@@ -17,9 +17,12 @@ Daehan은 Next.js 16 App Router 기반 웹 애플리케이션이다. Supabase가
 ```text
 src/
 ├── app/                    App Router, 전역 스타일과 폰트
+│   ├── (app)/              공통 header를 사용하는 일반 화면 Route Group
+│   ├── login/              공통 header가 없는 인증 화면
+│   └── signup/             공통 header가 없는 인증 화면
 ├── components/
 │   ├── ui/                 shadcn/ui primitive
-│   └── layout/             공통 Container와 반응형 레이아웃
+│   └── layout/             공통 header, Container와 반응형 레이아웃
 ├── hooks/                  공통 클라이언트 훅
 ├── lib/
 │   ├── supabase/           브라우저·서버 클라이언트와 Storage helper
@@ -30,6 +33,8 @@ src/
 ```
 
 `@/*`는 `src/*`를 가리킨다.
+
+Route Group은 URL에 포함되지 않는다. `/`, `/profile`, `/inspection-reports`, `/master/*`는 `(app)` layout의 공통 header를 사용하고 `/login`, `/signup`은 인증에 집중할 수 있도록 header 없이 root layout만 사용한다. 이전 `/reference-information/*` 주소는 대응하는 `/master/*` 주소로 영구 redirect할 수 있다.
 
 ## 3. 렌더링과 의존 방향
 

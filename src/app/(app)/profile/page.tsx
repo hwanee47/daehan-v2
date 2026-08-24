@@ -42,14 +42,7 @@ export default async function ProfilePage() {
   return (
     <main className="min-h-svh bg-background py-10 sm:py-16">
       <Container size="sm">
-        <Link
-          className="inline-flex min-h-11 items-center font-semibold text-primary underline-offset-4 hover:underline"
-          href="/"
-        >
-          홈으로 돌아가기
-        </Link>
-
-        <section className="mt-8 sm:mt-12" aria-labelledby="profile-title">
+        <section aria-labelledby="profile-title">
           <div className="flex items-center gap-4">
             <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-accent text-primary sm:size-16">
               <UserRound className="size-7 sm:size-8" aria-hidden="true" />

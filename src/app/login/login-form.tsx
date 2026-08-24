@@ -10,7 +10,7 @@ import { login, type LoginState } from "./actions";
 const initialLoginState: LoginState = { status: "idle" };
 
 const inputClassName =
-  "h-13 w-full rounded-2xl border border-input bg-background px-4 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/15";
+  "h-13 w-full rounded-sm border border-input bg-background px-4 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground/70 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/15";
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(login, initialLoginState);
@@ -81,4 +81,3 @@ export function LoginForm() {
     </form>
   );
 }
-

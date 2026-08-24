@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { CodeActionState } from "./types";
 
-const codesPath = "/reference-information/codes";
+const codesPath = "/master/codes";
 
 function getText(formData: FormData, key: string) {
   const value = formData.get(key);

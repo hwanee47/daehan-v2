@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 const menuItems = [
   { label: "품목관리", href: null },
   { label: "오차범위관리", href: null },
-  { label: "코드관리", href: "/reference-information/codes" },
+  { label: "코드관리", href: "/master/codes" },
 ] as const;
 
 export function ReferenceInformationMenu() {

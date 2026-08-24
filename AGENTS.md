@@ -67,7 +67,7 @@
 - class 조합에는 `cn`을 사용한다.
 - 색상은 shadcn CSS variable 기반 semantic token을 우선한다.
 - 전역 기본 폰트는 Pretendard Variable과 `font-sans`다.
-- 제품 UI와 카피는 `docs/design-system.md`의 Daehan 디자인 언어를 따른다. 신규·수정 UI 요청에도 같은 토큰, 단일 blue 강조, 큰 radius, 평면 surface, 해요체 원칙을 기본 적용한다.
+- 제품 UI와 카피는 `docs/design-system.md`의 Daehan 디자인 언어를 따른다. 신규·수정 UI 요청에도 같은 토큰, 단일 blue 강조, 평면 surface, 해요체 원칙을 기본 적용한다. 입력 계열은 `rounded-sm`, AG Grid는 radius 없음을 기본으로 하고 나머지 컴포넌트는 디자인 시스템의 radius 기준을 따른다.
 - Toss의 시각 원칙만 차용하며 Toss 브랜드, 로고, 금융 제품 구조나 전용 내비게이션은 복제하지 않는다.
 - 반응형은 `src/lib/responsive.ts`의 `sm`, `md`, `lg`, `xl`, `2xl` 기준을 사용한다.
 - 페이지 폭과 좌우 여백은 `Container`, 단순 노출 전환은 Tailwind 또는 `Responsive`를 우선한다.

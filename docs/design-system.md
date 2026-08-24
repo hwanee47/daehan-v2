@@ -8,7 +8,7 @@ Daehan의 기본 디자인 언어는 Toss Design System에서 시각 원칙을 �
 - 한 화면의 강조색은 primary blue 하나로 제한한다.
 - 정보 밀도보다 가독성, 명확한 행동과 넉넉한 여백을 우선한다.
 - 제품 카피는 일상적인 해요체로 쓰고 과장·명령·감탄 표현을 피한다.
-- 모서리는 12~28px의 큰 radius와 full pill을 사용하되 blob/squircle 장식은 피한다.
+- 카드, dialog, 버튼 등 주요 surface와 action의 모서리는 12~28px의 큰 radius와 full pill을 사용하되 blob/squircle 장식은 피한다. 입력 계열은 `rounded-sm`, AG Grid는 radius 없음을 기본으로 한다.
 - 표면은 평면을 기본으로 하고 구분은 간격, 타이포그래피, divider, tint, border 순서로 해결한다.
 - chrome에는 장식용 gradient, texture, 사진, 과한 shadow를 사용하지 않는다.
 
@@ -48,6 +48,8 @@ Daehan의 기본 디자인 언어는 Toss Design System에서 시각 원칙을 �
 - 공통 승격은 최소 두 개의 독립 기능에서 같은 의미로 재사용될 때 검토한다.
 - native element와 기존 shadcn 컴포넌트로 해결 가능한 경우 새 primitive를 만들지 않는다.
 - shadcn 컴포넌트는 프로젝트 semantic token과 공통 radius를 상속해야 한다.
+- `input`, `textarea`, `select` 등 입력 계열은 `rounded-sm`을 기본으로 한다.
+- AG Grid의 theme wrapper와 외곽 overflow container에는 radius를 적용하지 않는다.
 - primary 버튼은 화면당 하나를 원칙으로 하며 보조 행동은 secondary 또는 ghost로 표현한다.
 - 모든 interactive surface는 최소 44×44px hit area를 확보한다.
 - disabled는 컴포넌트 전체에 opacity 30%를 적용한다.

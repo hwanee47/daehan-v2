@@ -23,7 +23,7 @@ import type { CodeActionState, CodeDetail, CodeGroup } from "./types";
 const modules = [AllCommunityModule];
 const initialActionState: CodeActionState = { status: "idle" };
 const inputClassName =
-  "h-12 w-full rounded-xl border border-input bg-background px-4 outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
+  "h-12 w-full rounded-sm border border-input bg-background px-4 outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
 
 const gridTheme = themeQuartz.withParams({
   accentColor: "var(--primary)",
@@ -36,7 +36,7 @@ const gridTheme = themeQuartz.withParams({
   headerFontWeight: 600,
   rowHoverColor: "var(--accent)",
   spacing: 7,
-  wrapperBorderRadius: 16,
+  wrapperBorderRadius: 0,
 });
 
 const groupColumns: ColDef<CodeGroup>[] = [
@@ -186,7 +186,7 @@ function GroupEditor({
           <textarea
             aria-describedby={state.errors?.description ? "group-description-error" : undefined}
             aria-invalid={Boolean(state.errors?.description)}
-            className="min-h-24 w-full resize-y rounded-xl border border-input bg-background px-4 py-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20"
+            className="min-h-24 w-full resize-y rounded-sm border border-input bg-background px-4 py-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20"
             defaultValue={group?.description ?? ""}
             id="group-description"
             maxLength={500}
@@ -210,7 +210,7 @@ function GroupEditor({
             />
             <FieldError id="group-sort-order-error" message={state.errors?.sortOrder} />
           </div>
-          <label className="flex min-h-12 items-center gap-3 rounded-xl border border-input px-4 font-semibold">
+          <label className="flex min-h-12 items-center gap-3 rounded-sm border border-input px-4 font-semibold">
             <input defaultChecked={group?.is_active ?? true} name="isActive" type="checkbox" />
             활성 상태
           </label>
@@ -290,7 +290,7 @@ function DetailEditor({
           <textarea
             aria-describedby={state.errors?.description ? "detail-description-error" : undefined}
             aria-invalid={Boolean(state.errors?.description)}
-            className="min-h-24 w-full resize-y rounded-xl border border-input bg-background px-4 py-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20"
+            className="min-h-24 w-full resize-y rounded-sm border border-input bg-background px-4 py-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20"
             defaultValue={detail?.description ?? ""}
             id="detail-description"
             maxLength={500}
@@ -314,7 +314,7 @@ function DetailEditor({
             />
             <FieldError id="detail-sort-order-error" message={state.errors?.sortOrder} />
           </div>
-          <label className="flex min-h-12 items-center gap-3 rounded-xl border border-input px-4 font-semibold">
+          <label className="flex min-h-12 items-center gap-3 rounded-sm border border-input px-4 font-semibold">
             <input defaultChecked={detail?.is_active ?? true} name="isActive" type="checkbox" />
             활성 상태
           </label>
@@ -490,7 +490,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
             등록된 코드그룹이 없어요. 그룹을 먼저 추가해 주세요.
           </div>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded-2xl" aria-label="코드그룹 목록">
+          <div className="mt-4 overflow-x-auto" aria-label="코드그룹 목록">
             <div className="h-[420px] min-w-[560px]">
               <AgGridProvider modules={modules}>
                 <AgGridReact
@@ -564,7 +564,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
             등록된 상세 코드가 없어요.
           </div>
         ) : (
-          <div className="mt-4 overflow-x-auto rounded-2xl" aria-label="상세 코드 목록">
+          <div className="mt-4 overflow-x-auto" aria-label="상세 코드 목록">
             <div className="h-[420px] min-w-[720px]">
               <AgGridProvider modules={modules}>
                 <AgGridReact

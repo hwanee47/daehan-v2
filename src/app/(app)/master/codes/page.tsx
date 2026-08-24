@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Container } from "@/components/layout/container";
@@ -48,10 +47,7 @@ export default async function CodeManagementPage() {
   return (
     <main className="min-h-svh bg-background py-10 sm:py-16">
       <Container size="full">
-        <Link className="inline-flex min-h-11 items-center font-semibold text-primary" href="/">
-          홈으로 돌아가기
-        </Link>
-        <section className="mt-8 sm:mt-10" aria-labelledby="code-management-title">
+        <section aria-labelledby="code-management-title">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl" id="code-management-title">
             코드관리
           </h1>

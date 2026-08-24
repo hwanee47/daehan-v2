@@ -25,7 +25,7 @@ const daehanGridTheme = themeQuartz.withParams({
   headerFontWeight: 600,
   rowHoverColor: "var(--accent)",
   spacing: 8,
-  wrapperBorderRadius: 16,
+  wrapperBorderRadius: 0,
 });
 
 const rowData: InspectionReport[] = [
@@ -67,7 +67,7 @@ const defaultColDef: ColDef<InspectionReport> = {
 
 export function InspectionReportsGrid() {
   return (
-    <div className="overflow-x-auto rounded-2xl" aria-label="검사성적서 목록">
+    <div className="overflow-x-auto" aria-label="검사성적서 목록">
       <div className="h-96 min-w-[780px]">
         <AgGridProvider modules={modules}>
           <AgGridReact
