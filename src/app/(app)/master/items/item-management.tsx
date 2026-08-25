@@ -245,8 +245,8 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
   }
 
   return (
-    <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
-      <section aria-labelledby="items-heading" className="min-w-0 rounded-3xl border border-border bg-card p-4 sm:p-5">
+    <div className="mt-8 grid gap-6 @min-[1280px]/workspace:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
+      <section aria-labelledby="items-heading" className="min-w-0 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h2 className="text-xl font-semibold" id="items-heading">품목</h2><p className="mt-1 text-sm text-muted-foreground">품목을 선택하면 상세 정보를 확인할 수 있어요.</p></div>
           <Button onClick={() => { setEditingItem(null); setItemEditorOpen(true); }} size="sm" type="button"><Plus aria-hidden="true" />추가</Button>
@@ -262,7 +262,7 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
         )}
       </section>
 
-      <section aria-labelledby="item-details-heading" className="min-w-0 rounded-3xl border border-border bg-card p-4 sm:p-5">
+      <section aria-labelledby="item-details-heading" className="min-w-0 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h2 className="text-xl font-semibold" id="item-details-heading">품목상세</h2><p className="mt-1 text-sm text-muted-foreground">{selectedItem ? `${selectedItem.item_code}(${selectedItem.item_name}) 품목의 상세 정보예요.` : "품목을 선택해 주세요."}</p></div>
           <Button disabled={!selectedItem} onClick={() => { setEditingDetail(null); setDetailEditorOpen(true); }} size="sm" type="button"><Plus aria-hidden="true" />추가</Button>

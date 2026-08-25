@@ -88,11 +88,11 @@ export default async function ToleranceRangeManagementPage({
   if (loadError) console.error("Failed to load tolerance range management", { code: loadError.code });
 
   return (
-    <main className="min-h-svh bg-background py-10 sm:py-16">
-      <Container size="full">
+    <main className="@container/workspace min-h-svh bg-background">
+      <Container className="py-10 @min-[640px]/workspace:py-16" size="full">
         <section aria-labelledby="tolerance-range-management-title">
           <h1
-            className="text-3xl font-semibold tracking-tight sm:text-4xl"
+            className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl"
             id="tolerance-range-management-title"
           >
             오차범위관리
@@ -101,8 +101,8 @@ export default async function ToleranceRangeManagementPage({
             품목별 기준 치수 범위와 상한·하한 편차를 관리할 수 있어요.
           </p>
 
-          <form className="mt-8 rounded-3xl border border-border bg-card p-4 sm:p-6" method="get">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+          <form className="mt-8 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-6" method="get">
+            <div className="grid gap-4 @min-[768px]/workspace:grid-cols-2 @min-[1024px]/workspace:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
               <div className="space-y-2">
                 <label className="text-sm font-semibold" htmlFor="search-item-code">품목코드</label>
                 <input className="h-12 w-full rounded-sm border border-input bg-background px-4 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20" defaultValue={filters.itemCode} id="search-item-code" maxLength={100} name="itemCode" placeholder="품목코드를 입력해 주세요" />
@@ -115,7 +115,7 @@ export default async function ToleranceRangeManagementPage({
                 <label className="text-sm font-semibold" htmlFor="search-model-name">모델명</label>
                 <input className="h-12 w-full rounded-sm border border-input bg-background px-4 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20" defaultValue={filters.modelName} id="search-model-name" maxLength={100} name="modelName" placeholder="모델명을 입력해 주세요" />
               </div>
-              <div className="flex items-end gap-3 md:col-span-2 md:justify-end lg:col-span-1 lg:justify-start">
+              <div className="flex items-end gap-3 @min-[768px]/workspace:col-span-2 @min-[768px]/workspace:justify-end @min-[1024px]/workspace:col-span-1 @min-[1024px]/workspace:justify-start">
                 <Link className={cn(buttonVariants({ variant: "secondary" }))} href="/master/tolerance-ranges">
                   <RotateCcw aria-hidden="true" />초기화
                 </Link>

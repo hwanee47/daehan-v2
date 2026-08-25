@@ -45,10 +45,10 @@ export default async function CodeManagementPage() {
   if (loadError) console.error("Failed to load code management", { code: loadError.code });
 
   return (
-    <main className="min-h-svh bg-background py-10 sm:py-16">
-      <Container size="full">
+    <main className="@container/workspace min-h-svh bg-background">
+      <Container className="py-10 @min-[640px]/workspace:py-16" size="full">
         <section aria-labelledby="code-management-title">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl" id="code-management-title">
+          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="code-management-title">
             코드관리
           </h1>
           <p className="mt-3 text-muted-foreground">

@@ -440,8 +440,8 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
   }
 
   return (
-    <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
-      <section className="min-w-0 rounded-3xl border border-border bg-card p-4 sm:p-5" aria-labelledby="code-groups-heading">
+    <div className="mt-8 grid gap-6 @min-[1280px]/workspace:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
+      <section className="min-w-0 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-5" aria-labelledby="code-groups-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold" id="code-groups-heading">코드그룹</h2>
@@ -508,7 +508,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
         )}
       </section>
 
-      <section className="min-w-0 rounded-3xl border border-border bg-card p-4 sm:p-5" aria-labelledby="code-details-heading">
+      <section className="min-w-0 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-5" aria-labelledby="code-details-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-semibold" id="code-details-heading">상세 코드</h2>

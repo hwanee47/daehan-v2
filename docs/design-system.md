@@ -73,6 +73,24 @@ Daehan의 기본 디자인 언어는 Toss Design System에서 시각 원칙을 �
 - `useBreakpoint`는 화면 크기에 따라 실제 동작이 달라져야 할 때만 사용한다.
 - 모바일 360px, 태블릿 768px, 데스크톱 1280px을 기본 확인 지점으로 삼는다.
 
+### Viewport와 작업영역 container
+
+- 일반 페이지 chrome과 viewport 전체에 표시되는 UI는 `sm:`, `md:`, `lg:`, `xl:`, `2xl:` viewport modifier를 사용한다.
+- 탭으로 열리는 업무 화면은 최상위에 `@container/workspace`를 두고 내부 레이아웃을 실제 패널 너비로 판단한다.
+- workspace container도 위 표와 같은 수치를 사용한다: `@min-[640px]/workspace:`, `@min-[768px]/workspace:`, `@min-[1024px]/workspace:`, `@min-[1280px]/workspace:`, `@min-[1536px]/workspace:`.
+- 같은 업무 화면을 직접 URL과 탭 패널에서 재사용할 때 양쪽 모두 `workspace` container를 제공해 전환 시점이 같아야 한다.
+- 검색 폼, 카드 여백, 목록·상세 배치와 제목 크기처럼 패널 폭의 영향을 받는 표현은 container query를 사용한다.
+- `Dialog`, `AlertDialog` 등 Portal로 viewport에 표시되는 UI는 workspace container query를 사용하지 않고 viewport modifier를 유지한다.
+
+### 탭과 분할 작업영역
+
+- 탭은 최대 5개까지 열고 닫기 전까지 패널을 마운트해 입력, 선택, 그리드와 스크롤 위치를 유지한다.
+- 2분할은 `md` 이상에서 제공하며 기본 비율은 50:50, 조절 범위는 25:75부터 75:25까지다.
+- 가운데 separator는 1px 경계선을 유지하되 충분한 pointer hit area를 제공한다. 방향키로 조절하고 Shift 조합으로 큰 단위 조절, Home 또는 더블클릭으로 50:50 복원을 지원한다.
+- 앱 chrome은 `header`, `tabs`, 남은 높이의 `workspace` 순서로 구성한다. 헤더와 탭은 패널 스크롤에 포함하지 않는다.
+- 단일 화면과 분할 화면 모두 각 업무 패널이 자체 세로 스크롤을 소유한다. 분할 패널끼리 scroll position을 공유하거나 wheel 스크롤이 반대 패널로 이어지지 않게 한다.
+- 실제 검증은 단일·2분할, 25:75·50:50·75:25 비율에서 수행한다. 각 패널의 container 전환, 가로 overflow, 독립 스크롤, Portal 잘림과 separator 키보드 조작을 확인한다.
+
 ## 7. 접근성
 
 - 입력에는 연결된 `label`과 오류 설명을 제공한다.

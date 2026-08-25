@@ -88,6 +88,7 @@ export async function saveItem(
     return mapMutationError(error.code);
   }
   revalidatePath(itemsPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: seq ? "품목을 수정했어요." : "품목을 추가했어요." };
 }
 
@@ -131,6 +132,7 @@ export async function saveItemDetail(
     return mapMutationError(error.code);
   }
   revalidatePath(itemsPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: seq ? "품목상세를 수정했어요." : "품목상세를 추가했어요." };
 }
 
@@ -145,6 +147,7 @@ export async function deleteItem(
   const { error } = await supabase.from("items").delete().eq("seq", seq);
   if (error) return mapMutationError(error.code, true);
   revalidatePath(itemsPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: "품목을 삭제했어요." };
 }
 
@@ -159,5 +162,6 @@ export async function deleteItemDetail(
   const { error } = await supabase.from("item_details").delete().eq("seq", seq);
   if (error) return mapMutationError(error.code);
   revalidatePath(itemsPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: "품목상세를 삭제했어요." };
 }

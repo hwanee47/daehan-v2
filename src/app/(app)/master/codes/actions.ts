@@ -114,6 +114,7 @@ export async function saveCodeGroup(
   }
 
   revalidatePath(codesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: seq ? "코드그룹을 수정했어요." : "코드그룹을 추가했어요." };
 }
 
@@ -167,6 +168,7 @@ export async function saveCodeDetail(
   }
 
   revalidatePath(codesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: seq ? "상세 코드를 수정했어요." : "상세 코드를 추가했어요." };
 }
 
@@ -183,6 +185,7 @@ export async function toggleCodeGroup(
   const { error } = await supabase.from("code_groups").update({ is_active: isActive }).eq("seq", seq);
   if (error) return mapMutationError(error.code);
   revalidatePath(codesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: isActive ? "코드그룹을 활성화했어요." : "코드그룹을 비활성화했어요." };
 }
 
@@ -199,6 +202,7 @@ export async function toggleCodeDetail(
   const { error } = await supabase.from("code_details").update({ is_active: isActive }).eq("seq", seq);
   if (error) return mapMutationError(error.code);
   revalidatePath(codesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: isActive ? "상세 코드를 활성화했어요." : "상세 코드를 비활성화했어요." };
 }
 
@@ -214,6 +218,7 @@ export async function deleteCodeGroup(
   const { error } = await supabase.from("code_groups").delete().eq("seq", seq);
   if (error) return mapMutationError(error.code, true);
   revalidatePath(codesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: "코드그룹을 삭제했어요." };
 }
 
@@ -229,5 +234,6 @@ export async function deleteCodeDetail(
   const { error } = await supabase.from("code_details").delete().eq("seq", seq);
   if (error) return mapMutationError(error.code);
   revalidatePath(codesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: "상세 코드를 삭제했어요." };
 }

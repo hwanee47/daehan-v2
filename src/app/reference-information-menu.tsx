@@ -1,10 +1,10 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { WorkspaceMenuButton } from "@/components/layout/workspace-menu-button";
 
 const menuItems = [
   { label: "품목관리", href: "/master/items" },
@@ -70,15 +70,15 @@ export function ReferenceInformationMenu() {
           role="menu"
         >
           {menuItems.map((item) => (
-            <Link
+            <WorkspaceMenuButton
               className="flex min-h-11 items-center rounded-xl px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               href={item.href}
               key={item.label}
-              onClick={() => setIsOpen(false)}
+              onOpen={() => setIsOpen(false)}
               role="menuitem"
             >
               {item.label}
-            </Link>
+            </WorkspaceMenuButton>
           ))}
         </div>
       ) : null}

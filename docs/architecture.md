@@ -18,6 +18,7 @@ Daehan은 Next.js 16 App Router 기반 웹 애플리케이션이다. Supabase가
 src/
 ├── app/                    App Router, 전역 스타일과 폰트
 │   ├── (app)/              공통 header를 사용하는 일반 화면 Route Group
+│   │   └── workspace-*     열린 업무 패널의 데이터와 클라이언트 수명을 관리하는 공통 작업영역
 │   ├── login/              공통 header가 없는 인증 화면
 │   └── signup/             공통 header가 없는 인증 화면
 ├── components/
@@ -36,6 +37,10 @@ src/
 
 Route Group은 URL에 포함되지 않는다. `/`, `/profile`, `/inspection-reports`, `/master/*`는 `(app)` layout의 공통 header를 사용하고 `/login`, `/signup`은 인증에 집중할 수 있도록 header 없이 root layout만 사용한다. 이전 `/reference-information/*` 주소는 대응하는 `/master/*` 주소로 영구 redirect할 수 있다.
 
+인증된 사용자가 헤더에서 업무 메뉴를 열면 `(app)` layout의 작업영역이 해당 패널을 생성한다. 탭은 최대 5개까지 열 수 있고 열린 패널은 탭을 닫기 전까지 동시에 마운트한다. 기본적으로 활성 패널 하나를 표시하며 `md` 이상 2분할 모드에서는 활성 패널과 인접 패널을 함께 표시한다. 분할 비율은 25~75% 범위에서 pointer와 키보드로 조절하며 Zustand persist 상태로 유지한다. 탭 전환은 URL 이동 없이 클라이언트 UI 상태만 바꾸고, 기존 `/inspection-reports`, `/master/*` URL의 직접 접근과 새로고침 호환은 유지한다.
+
+`(app)` layout은 화면 높이 안에서 `header`, `tabs`, `workspace`를 세로로 배치한다. 헤더와 탭은 고정된 app chrome이며 남은 작업영역에서 각 마운트된 패널이 독립적인 세로 스크롤을 소유한다. 따라서 분할 패널의 스크롤 위치는 서로 영향을 주지 않고, 탭을 닫기 전까지 패널 DOM의 입력·선택·그리드·스크롤 상태가 유지된다. 전체화면에서도 같은 작업영역 구조를 사용한다.
+
 ## 3. 렌더링과 의존 방향
 
 ```text
@@ -53,6 +58,9 @@ Client Component
 - 서버 Supabase 모듈이 Client Component 또는 Zustand store에 의존하지 않는다.
 - UI 컴포넌트가 인증 쿠키와 DB 응답 세부 구조를 직접 처리하지 않는다.
 - 기능 전용 코드는 해당 route segment 가까이에 둔다.
+- 작업영역 shell은 열린 탭과 패널 수명만 소유한다. 각 패널의 입력, 선택과 그리드 상태는 패널 지역 상태에 두고 전역 store에 복제하지 않는다.
+- 작업영역 shell은 각 패널의 독립 스크롤 컨테이너와 조절 가능한 2분할 layout을 소유한다. 분할 비율 이외의 탭별 scroll position은 DOM 상태로 유지한다.
+- 작업영역의 초기 데이터와 권한은 `(app)` Server layout에서 준비하며, 데이터 변경은 기존 Server Action과 Supabase RLS를 거친다.
 
 ## 4. 데이터와 인증
 
@@ -71,11 +79,17 @@ Client Component
 | 공유 가능한 URL 상태 | search params |
 | 서버 데이터 | Server Component/Supabase query |
 | 여러 화면의 클라이언트 UI | Zustand `src/stores` |
+| 열린 업무 탭·활성 탭 | Zustand `src/stores/ui-store.ts` |
+| 2분할 여부·분할 비율 | Zustand `src/stores/ui-store.ts` persist |
+| 탭별 입력·선택·그리드 상태 | 마운트된 업무 패널의 지역 상태 |
+| 탭별 스크롤 위치 | 마운트된 패널 scroll container의 DOM 상태 |
 | 인증 세션 | Supabase Auth cookie |
 
 ## 6. 반응형
 
 CSS와 TypeScript는 같은 breakpoint를 사용한다: `sm 640`, `md 768`, `lg 1024`, `xl 1280`, `2xl 1536`. 레이아웃 폭은 `Container`, 단순 표시 전환은 Tailwind 또는 `Responsive`, JavaScript 동작 분기가 꼭 필요한 경우만 `useBreakpoint`를 사용한다.
+
+일반 app chrome과 Portal UI는 viewport breakpoint를 사용한다. 탭 업무 화면과 같은 패널형 콘텐츠는 이름이 있는 `workspace` size container를 제공하고 동일 수치의 Container Query로 내부 배치를 결정한다. 직접 URL과 탭 패널은 같은 container 경계를 제공해 레이아웃 동작을 일치시킨다.
 
 ## 7. 문서 관리
 

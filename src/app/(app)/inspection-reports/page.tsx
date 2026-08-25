@@ -10,10 +10,10 @@ export const metadata: Metadata = {
 
 export default function InspectionReportsPage() {
   return (
-    <main className="min-h-svh py-10 sm:py-16">
-      <Container size="lg">
+    <main className="@container/workspace min-h-svh">
+      <Container className="py-10 @min-[640px]/workspace:py-16" size="lg">
         <section aria-labelledby="inspection-reports-title">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl" id="inspection-reports-title">
+          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="inspection-reports-title">
             검사성적서
           </h1>
           <p className="mt-3 text-muted-foreground">

@@ -128,6 +128,7 @@ export async function saveToleranceRange(
   }
 
   revalidatePath(toleranceRangesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: seq ? "오차범위를 수정했어요." : "오차범위를 추가했어요." };
 }
 
@@ -150,5 +151,6 @@ export async function deleteToleranceRange(
   }
 
   revalidatePath(toleranceRangesPath);
+  revalidatePath("/", "layout");
   return { status: "success", message: "오차범위를 삭제했어요." };
 }

@@ -72,6 +72,11 @@
 - 반응형은 `src/lib/responsive.ts`의 `sm`, `md`, `lg`, `xl`, `2xl` 기준을 사용한다.
 - 페이지 폭과 좌우 여백은 `Container`, 단순 노출 전환은 Tailwind 또는 `Responsive`를 우선한다.
 - 임의 breakpoint를 반복해서 만들지 않는다. 새 전역 기준이 필요하면 문서와 CSS/TypeScript 정의를 함께 검토한다.
+- 탭으로 열리는 신규·수정 업무 화면은 직접 URL과 작업영역 패널 양쪽에서 같은 기능, 상태와 권한으로 동작해야 한다.
+- 업무 화면 최상위에는 이름이 있는 size container인 `@container/workspace`를 두고, 내부 배치·간격·타이포그래피는 `@min-[640px]/workspace:`, `@min-[768px]/workspace:`, `@min-[1024px]/workspace:`, `@min-[1280px]/workspace:`, `@min-[1536px]/workspace:`처럼 패널 너비 기준으로 전환한다. 업무 패널 내부 배치를 viewport modifier만으로 결정하지 않는다.
+- `Dialog`, `AlertDialog`처럼 Portal로 viewport에 표시되는 UI는 workspace container가 아니라 기존 viewport breakpoint를 사용하고 패널 overflow에 잘리지 않게 유지한다.
+- `(app)` 작업영역은 `header`, `tabs`, 남은 높이의 `workspace` 구조를 유지한다. 각 열린 패널은 자체 세로 스크롤을 소유하며 다른 분할 패널이나 문서 스크롤에 의존하지 않는다.
+- 열린 탭은 닫을 때까지 마운트해 입력, 선택, AG Grid와 스크롤 위치를 유지한다. 탭별 지역 상태를 전역 store에 복제하지 않는다.
 - 접근 가능한 HTML, label, 키보드 조작과 aria 속성을 유지한다.
 
 ## 6. Supabase와 데이터 접근
@@ -96,6 +101,7 @@
 - URL로 복원되어야 하는 검색·필터·페이지는 search params를 사용한다.
 - 서버 데이터는 Server Component 또는 Supabase query 결과를 기준으로 하며 Zustand에 중복 저장하지 않는다.
 - 여러 화면이 공유하는 클라이언트 UI 상태에만 `src/stores`의 Zustand store를 사용한다.
+- 열린 탭, 활성 탭, 분할 여부와 분할 비율처럼 작업영역 전체가 공유하는 UI 상태만 Zustand에 둔다. 분할 비율은 25~75% 범위로 제한한다.
 - 인증 토큰, 비밀번호와 민감정보를 Zustand나 브라우저 storage에 저장하지 않는다.
 - persist middleware를 사용할 때 hydration 전후 UI와 저장 데이터 버전을 명시적으로 처리한다.
 - 파생 가능한 값은 별도 상태로 복제하지 않는다.
@@ -116,7 +122,7 @@
 2. `npm run lint`로 정적 오류를 확인한다.
 3. `npx tsc --noEmit`으로 타입을 확인한다.
 4. 필요하면 `npx next build --webpack`으로 프로덕션 빌드를 확인한다.
-5. UI 변경은 모바일, 태블릿, 데스크톱 viewport와 키보드 흐름을 확인한다.
+5. UI 변경은 모바일, 태블릿, 데스크톱 viewport와 키보드 흐름을 확인한다. 탭 업무 화면은 직접 URL과 패널 양쪽, 단일·2분할, 25:75·50:50·75:25 비율에서 container 반응형, 가로 overflow와 독립 스크롤을 확인한다. Portal UI는 패널에 잘리지 않는지 확인하고 separator는 pointer, 방향키, Home과 focus 표시를 검증한다.
 6. DB 변경은 migration, RLS, 허용/거부 케이스와 rollback 가능성을 확인한다.
 
 실행하지 못한 검증, 기존 실패와 남은 위험은 결과에 명시한다.
