@@ -4,6 +4,7 @@ import type { AppTabHref } from "@/lib/app-tabs";
 import { createClient } from "@/lib/supabase/server";
 
 import type { CodeDetail, CodeGroup } from "./master/codes/types";
+import { attachItemImageUrls } from "./master/items/item-image-urls";
 import type { Item, ItemDetail } from "./master/items/types";
 import type {
   ItemToleranceRange,
@@ -47,11 +48,11 @@ async function getWorkspace() {
     await Promise.all([
       supabase
         .from("items")
-        .select("seq, item_code, item_name, model_name, note")
+        .select("seq, item_code, item_name, image_path, model_name, note")
         .order("seq"),
       supabase
         .from("item_details")
-        .select("seq, item_seq, item_detail_code, item_detail_name, material, note")
+        .select("seq, item_seq, item_detail_code, item_detail_name, image_path, material, note")
         .order("seq"),
       supabase
         .from("item_tolerance_ranges")
@@ -85,11 +86,17 @@ async function getWorkspace() {
     });
   }
 
+  const itemImages = await attachItemImageUrls(
+    supabase,
+    (itemsResult.data ?? []) as Omit<Item, "image_url">[],
+    (itemDetailsResult.data ?? []) as Omit<ItemDetail, "image_url">[],
+  );
+
   panels["/master/items"] = (
     <ItemsWorkspacePanel
-      details={(itemDetailsResult.data ?? []) as ItemDetail[]}
+      details={itemImages.details}
       hasError={itemHasError}
-      items={(itemsResult.data ?? []) as Item[]}
+      items={itemImages.items}
     />
   );
   panels["/master/tolerance-ranges"] = (

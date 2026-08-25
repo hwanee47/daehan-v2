@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
+import { itemImageBucket } from "@/lib/item-images";
 import { createClient } from "@/lib/supabase/server";
+import { removeFiles } from "@/lib/supabase/storage";
 
 import type { ItemActionState } from "./types";
 
@@ -54,6 +56,21 @@ function mapMutationError(code?: string, isItemDelete = false): ItemActionState 
     };
   }
   return { status: "error", message: "저장하지 못했어요. 잠시 후 다시 시도해 주세요." };
+}
+
+async function removeLinkedImage(
+  supabase: NonNullable<Awaited<ReturnType<typeof getAdminClient>>["supabase"]>,
+  imagePath: string | null | undefined,
+) {
+  if (!imagePath) return;
+
+  try {
+    await removeFiles(supabase, itemImageBucket, [imagePath]);
+  } catch (error) {
+    console.error("Failed to remove deleted item image", {
+      message: error instanceof Error ? error.message : "Unknown storage error",
+    });
+  }
 }
 
 export async function saveItem(
@@ -144,8 +161,14 @@ export async function deleteItem(
   if (!seq) return { status: "error", message: "삭제할 품목을 확인해 주세요." };
   const { error: authorizationError, supabase } = await getAdminClient();
   if (!supabase) return { status: "error", message: authorizationError ?? "권한을 확인해 주세요." };
+  const { data: item } = await supabase
+    .from("items")
+    .select("image_path")
+    .eq("seq", seq)
+    .maybeSingle();
   const { error } = await supabase.from("items").delete().eq("seq", seq);
   if (error) return mapMutationError(error.code, true);
+  await removeLinkedImage(supabase, item?.image_path);
   revalidatePath(itemsPath);
   revalidatePath("/", "layout");
   return { status: "success", message: "품목을 삭제했어요." };
@@ -159,8 +182,14 @@ export async function deleteItemDetail(
   if (!seq) return { status: "error", message: "삭제할 품목상세를 확인해 주세요." };
   const { error: authorizationError, supabase } = await getAdminClient();
   if (!supabase) return { status: "error", message: authorizationError ?? "권한을 확인해 주세요." };
+  const { data: detail } = await supabase
+    .from("item_details")
+    .select("image_path")
+    .eq("seq", seq)
+    .maybeSingle();
   const { error } = await supabase.from("item_details").delete().eq("seq", seq);
   if (error) return mapMutationError(error.code);
+  await removeLinkedImage(supabase, detail?.image_path);
   revalidatePath(itemsPath);
   revalidatePath("/", "layout");
   return { status: "success", message: "품목상세를 삭제했어요." };

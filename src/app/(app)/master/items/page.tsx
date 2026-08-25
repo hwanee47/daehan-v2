@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 import { ItemManagement } from "./item-management";
+import { attachItemImageUrls } from "./item-image-urls";
 import type { Item, ItemDetail } from "./types";
 
 export const metadata: Metadata = {
@@ -60,7 +61,7 @@ export default async function ItemManagementPage({
 
   let itemsQuery = supabase
     .from("items")
-    .select("seq, item_code, item_name, model_name, note")
+    .select("seq, item_code, item_name, image_path, model_name, note")
     .order("seq");
 
   if (filters.itemCode) {
@@ -78,13 +79,18 @@ export default async function ItemManagementPage({
   const detailsResult = itemSeqs.length
     ? await supabase
       .from("item_details")
-      .select("seq, item_seq, item_detail_code, item_detail_name, material, note")
+      .select("seq, item_seq, item_detail_code, item_detail_name, image_path, material, note")
       .in("item_seq", itemSeqs)
       .order("seq")
     : { data: [], error: null };
 
   const loadError = itemsResult.error || detailsResult.error;
   if (loadError) console.error("Failed to load item management", { code: loadError.code });
+  const itemImages = await attachItemImageUrls(
+    supabase,
+    (itemsResult.data ?? []) as Omit<Item, "image_url">[],
+    (detailsResult.data ?? []) as Omit<ItemDetail, "image_url">[],
+  );
 
   return (
     <main className="@container/workspace min-h-svh bg-background">
@@ -125,9 +131,9 @@ export default async function ItemManagementPage({
             </div>
           ) : (
             <ItemManagement
-              details={(detailsResult.data ?? []) as ItemDetail[]}
+              details={itemImages.details}
               hasFilters={hasFilters}
-              items={(itemsResult.data ?? []) as Item[]}
+              items={itemImages.items}
             />
           )}
         </section>
