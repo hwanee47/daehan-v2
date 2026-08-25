@@ -65,13 +65,13 @@ export function ReferenceInformationMenu() {
       {isOpen ? (
         <div
           aria-label="기준정보 하위 메뉴"
-          className="absolute top-full right-0 z-50 mt-2 w-48 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-lg"
+          className="absolute top-full right-0 z-50 mt-2 w-40 rounded-2xl border border-border bg-popover p-2 text-popover-foreground shadow-lg"
           id={menuId}
           role="menu"
         >
           {menuItems.map((item) => (
             <WorkspaceMenuButton
-              className="flex min-h-11 items-center rounded-xl px-3 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-h-11 w-full items-center justify-start rounded-xl px-3 text-left text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               href={item.href}
               key={item.label}
               onOpen={() => setIsOpen(false)}
