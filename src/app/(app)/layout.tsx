@@ -3,6 +3,7 @@ import { AppTabs } from "@/components/layout/app-tabs";
 import type { AppTabHref } from "@/lib/app-tabs";
 import { createClient } from "@/lib/supabase/server";
 
+import { getInspectionReportData } from "./inspection-reports/data";
 import type { CodeDetail, CodeGroup } from "./master/codes/types";
 import { attachItemImageUrls } from "./master/items/item-image-urls";
 import type { Item, ItemDetail } from "./master/items/types";
@@ -12,6 +13,7 @@ import type {
 } from "./master/tolerance-ranges/types";
 import {
   CodesWorkspacePanel,
+  InspectionMeasurementsWorkspacePanel,
   InspectionReportsWorkspacePanel,
   ItemsWorkspacePanel,
   ToleranceRangesWorkspacePanel,
@@ -33,9 +35,11 @@ async function getWorkspace() {
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
-  const allowedTabHrefs: AppTabHref[] = ["/inspection-reports"];
+  const allowedTabHrefs: AppTabHref[] = ["/inspection-reports", "/inspection-measurements"];
+  const inspectionReportData = await getInspectionReportData();
   const panels: Partial<Record<AppTabHref, React.ReactNode>> = {
-    "/inspection-reports": <InspectionReportsWorkspacePanel />,
+    "/inspection-reports": <InspectionReportsWorkspacePanel data={inspectionReportData} />,
+    "/inspection-measurements": <InspectionMeasurementsWorkspacePanel data={inspectionReportData} />,
   };
 
   if (profile?.role !== "admin") {

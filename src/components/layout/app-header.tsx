@@ -2,11 +2,11 @@ import { UserRound } from "lucide-react";
 import Image from "next/image";
 
 import { ReferenceInformationMenu } from "@/app/reference-information-menu";
+import { InspectionReportMenu } from "@/app/inspection-report-menu";
 import { homeContent } from "@/content/home";
 import { createClient } from "@/lib/supabase/server";
 
 import { Container } from "./container";
-import { WorkspaceMenuButton } from "./workspace-menu-button";
 import { WorkspaceExitLink } from "./workspace-exit-link";
 
 async function getCurrentUserProfile() {
@@ -62,9 +62,7 @@ export async function AppHeader() {
 
         {isAuthenticated ? (
           <nav aria-label="주요 메뉴" className="flex items-center justify-self-center">
-            <WorkspaceMenuButton className="flex h-11 items-center rounded-xl px-3 font-semibold text-foreground transition-colors hover:bg-muted sm:px-5" href="/inspection-reports">
-              검사성적서
-            </WorkspaceMenuButton>
+            <InspectionReportMenu />
             {isAdmin ? <ReferenceInformationMenu /> : null}
           </nav>
         ) : null}

@@ -3,12 +3,13 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
 import type { CellKeyDownEvent, ColDef, RowClickedEvent, RowDoubleClickedEvent } from "ag-grid-community";
-import { AllCommunityModule, themeQuartz } from "ag-grid-community";
+import { AllCommunityModule } from "ag-grid-community";
 import { AgGridProvider, AgGridReact } from "ag-grid-react";
 import { ImageIcon, LoaderCircle, Maximize2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 import {
   itemImageAccept,
   itemImageMaxBytes,
@@ -24,20 +25,6 @@ const inputClassName =
   "h-12 w-full rounded-sm border border-input bg-background px-4 outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
 const textareaClassName =
   "min-h-24 w-full resize-y rounded-sm border border-input bg-background px-4 py-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
-
-const gridTheme = themeQuartz.withParams({
-  accentColor: "var(--primary)",
-  backgroundColor: "var(--background)",
-  borderColor: "var(--border)",
-  foregroundColor: "var(--foreground)",
-  fontFamily: "var(--font-pretendard), sans-serif",
-  fontSize: 14,
-  headerBackgroundColor: "var(--muted)",
-  headerFontWeight: 600,
-  rowHoverColor: "var(--accent)",
-  spacing: 7,
-  wrapperBorderRadius: 0,
-});
 
 const itemColumns: ColDef<Item>[] = [
   { field: "item_code", headerName: "품목코드", minWidth: 150, flex: 1 },
@@ -640,7 +627,7 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
         {items.length === 0 ? (
           <div className="mt-4 flex h-80 items-center justify-center rounded-2xl bg-muted px-6 text-center text-muted-foreground">{hasFilters ? "조회조건에 맞는 품목이 없어요." : "등록된 품목이 없어요. 품목을 먼저 추가해 주세요."}</div>
         ) : (
-          <div aria-label="품목 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[560px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={itemColumns} defaultColDef={defaultColDef} getRowClass={({ data }) => data?.seq === effectiveItemSeq ? "!bg-accent" : undefined} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<Item>) => { if (event.data && isEnterKey(event)) openItemDetails(event.data); }} onRowClicked={selectItem} onRowDoubleClicked={(event: RowDoubleClickedEvent<Item>) => { if (event.data) openItemDetails(event.data); }} rowData={items} theme={gridTheme} /></AgGridProvider></div></div>
+          <div aria-label="품목 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[560px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={itemColumns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<Item>) => { if (event.data && isEnterKey(event)) openItemDetails(event.data); }} onRowClicked={selectItem} onRowDataUpdated={({ api }) => syncSelectedGridRow(api, effectiveItemSeq)} onRowDoubleClicked={(event: RowDoubleClickedEvent<Item>) => { if (event.data) openItemDetails(event.data); }} rowData={items} rowSelection={appGridSingleRowSelection} theme={appGridTheme} /></AgGridProvider></div></div>
         )}
       </section>
 
@@ -659,7 +646,7 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
         ) : visibleDetails.length === 0 ? (
           <div className="mt-4 flex h-80 items-center justify-center rounded-2xl bg-muted px-6 text-center text-muted-foreground">등록된 품목상세가 없어요.</div>
         ) : (
-          <div aria-label="품목상세 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[720px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={detailColumns} defaultColDef={defaultColDef} getRowClass={({ data }) => data?.seq === selectedDetailSeq ? "!bg-accent" : undefined} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<ItemDetail>) => { if (event.data && isEnterKey(event)) openItemDetailDetails(event.data); }} onRowClicked={(event: RowClickedEvent<ItemDetail>) => event.data && setSelectedDetailSeq(event.data.seq)} onRowDoubleClicked={(event: RowDoubleClickedEvent<ItemDetail>) => { if (event.data) openItemDetailDetails(event.data); }} rowData={visibleDetails} theme={gridTheme} /></AgGridProvider></div></div>
+          <div aria-label="품목상세 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[720px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={detailColumns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<ItemDetail>) => { if (event.data && isEnterKey(event)) openItemDetailDetails(event.data); }} onRowClicked={(event: RowClickedEvent<ItemDetail>) => event.data && setSelectedDetailSeq(event.data.seq)} onRowDataUpdated={({ api }) => syncSelectedGridRow(api, selectedDetailSeq)} onRowDoubleClicked={(event: RowDoubleClickedEvent<ItemDetail>) => { if (event.data) openItemDetailDetails(event.data); }} rowData={visibleDetails} rowSelection={appGridSingleRowSelection} theme={appGridTheme} /></AgGridProvider></div></div>
         )}
       </section>
 

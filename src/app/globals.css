@@ -143,3 +143,60 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+@container workspace (min-width: 1024px) {
+  [data-workspace-root]:fullscreen .inspection-measurement-form {
+    height: calc(100svh - 140px);
+  }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+.inspection-print-datetime {
+  display: none;
+}
+
+.inspection-print-sheet tbody {
+  font-size: 11px;
+}
+
+@media print {
+  body:has(.inspection-print-sheet) * {
+    visibility: hidden !important;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet,
+  body:has(.inspection-print-sheet) .inspection-print-sheet * {
+    visibility: visible !important;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet {
+    position: absolute;
+    inset: 0 auto auto 0;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: 7mm;
+    box-shadow: none;
+    print-color-adjust: exact;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-datetime {
+    display: block;
+    margin-top: 2mm;
+    text-align: right;
+    font-size: 8pt;
+    font-weight: 400;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-hide {
+    display: none !important;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet svg {
+    overflow: hidden !important;
+  }
+}

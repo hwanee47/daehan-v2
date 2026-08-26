@@ -3,12 +3,13 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
 import type { ColDef, RowClickedEvent } from "ag-grid-community";
-import { AllCommunityModule, themeQuartz } from "ag-grid-community";
+import { AllCommunityModule } from "ag-grid-community";
 import { AgGridProvider, AgGridReact } from "ag-grid-react";
 import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 
 import {
   deleteCodeDetail,
@@ -24,20 +25,6 @@ const modules = [AllCommunityModule];
 const initialActionState: CodeActionState = { status: "idle" };
 const inputClassName =
   "h-12 w-full rounded-sm border border-input bg-background px-4 outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
-
-const gridTheme = themeQuartz.withParams({
-  accentColor: "var(--primary)",
-  backgroundColor: "var(--background)",
-  borderColor: "var(--border)",
-  foregroundColor: "var(--foreground)",
-  fontFamily: "var(--font-pretendard), sans-serif",
-  fontSize: 14,
-  headerBackgroundColor: "var(--muted)",
-  headerFontWeight: 600,
-  rowHoverColor: "var(--accent)",
-  spacing: 7,
-  wrapperBorderRadius: 0,
-});
 
 const groupColumns: ColDef<CodeGroup>[] = [
   { field: "group_code", headerName: "그룹 코드", minWidth: 160, flex: 1 },
@@ -440,7 +427,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
   }
 
   return (
-    <div className="mt-8 grid gap-6 @min-[1280px]/workspace:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
+    <div className="grid gap-6 @min-[1280px]/workspace:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)]">
       <section className="min-w-0 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-5" aria-labelledby="code-groups-heading">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -496,11 +483,12 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
                 <AgGridReact
                   columnDefs={groupColumns}
                   defaultColDef={defaultColDef}
-                  getRowClass={({ data }) => (data?.seq === effectiveGroupSeq ? "!bg-accent" : undefined)}
                   getRowId={({ data }) => String(data.seq)}
                   onRowClicked={selectGroup}
+                  onRowDataUpdated={({ api }) => syncSelectedGridRow(api, effectiveGroupSeq)}
                   rowData={groups}
-                  theme={gridTheme}
+                  rowSelection={appGridSingleRowSelection}
+                  theme={appGridTheme}
                 />
               </AgGridProvider>
             </div>
@@ -570,11 +558,12 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
                 <AgGridReact
                   columnDefs={detailColumns}
                   defaultColDef={defaultColDef}
-                  getRowClass={({ data }) => (data?.seq === selectedDetailSeq ? "!bg-accent" : undefined)}
                   getRowId={({ data }) => String(data.seq)}
                   onRowClicked={selectDetail}
+                  onRowDataUpdated={({ api }) => syncSelectedGridRow(api, selectedDetailSeq)}
                   rowData={visibleDetails}
-                  theme={gridTheme}
+                  rowSelection={appGridSingleRowSelection}
+                  theme={appGridTheme}
                 />
               </AgGridProvider>
             </div>

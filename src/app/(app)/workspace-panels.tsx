@@ -4,9 +4,12 @@ import { RotateCcw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Container } from "@/components/layout/container";
+import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { Button } from "@/components/ui/button";
 
-import { InspectionReportsGrid } from "./inspection-reports/inspection-reports-grid";
+import { InspectionReportManagement } from "./inspection-reports/inspection-report-management";
+import type { InspectionReportData } from "./inspection-reports/types";
+import { InspectionMeasurementSheet } from "./inspection-measurements/inspection-measurement-sheet";
 import { CodeManagement } from "./master/codes/code-management";
 import type { CodeDetail, CodeGroup } from "./master/codes/types";
 import { ItemManagement } from "./master/items/item-management";
@@ -50,7 +53,7 @@ function WorkspaceSearch({
 
   return (
     <form
-      className="mt-8 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-6"
+      className="rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-6"
       onSubmit={(event) => {
         event.preventDefault();
         onApply({
@@ -102,27 +105,30 @@ function WorkspaceSearch({
   );
 }
 
-function LoadError({ message }: { message: string }) {
+function LoadError({ flush = false, message }: { flush?: boolean; message: string }) {
   return (
-    <div className="mt-8 rounded-3xl border border-border bg-card p-6" role="alert">
+    <div className={`${flush ? "" : "mt-8 "}rounded-3xl border border-border bg-card p-6`} role="alert">
       <h2 className="text-lg font-semibold">{message}</h2>
       <p className="mt-2 text-muted-foreground">잠시 후 다시 시도해 주세요.</p>
     </div>
   );
 }
 
-export function InspectionReportsWorkspacePanel() {
+export function InspectionReportsWorkspacePanel({ data }: { data: InspectionReportData }) {
   return (
     <main className="@container/workspace min-h-svh">
-      <Container className="py-10 @min-[640px]/workspace:py-16" size="lg">
-        <section aria-labelledby="workspace-inspection-reports-title">
-          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="workspace-inspection-reports-title">검사성적서</h1>
-          <p className="mt-3 text-muted-foreground">등록된 검사성적서를 확인하고 열 제목을 선택해 정렬할 수 있어요.</p>
-          <div className="mt-8"><InspectionReportsGrid /></div>
+      <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
+        <WorkspaceBreadcrumb current="성적서 관리" parent="검사성적서" />
+        <section>
+          <InspectionReportManagement data={data} />
         </section>
       </Container>
     </main>
   );
+}
+
+export function InspectionMeasurementsWorkspacePanel({ data }: { data: InspectionReportData }) {
+  return <main className="@container/workspace min-h-svh bg-background"><Container className="py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current="측정결과 입력" parent="검사성적서" /><section><InspectionMeasurementSheet data={data} /></section></Container></main>;
 }
 
 export function ItemsWorkspacePanel({
@@ -151,10 +157,9 @@ export function ItemsWorkspacePanel({
 
   return (
     <main className="@container/workspace min-h-svh bg-background">
-      <Container className="py-10 @min-[640px]/workspace:py-16" size="full">
-        <section aria-labelledby="workspace-items-title">
-          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="workspace-items-title">품목관리</h1>
-          <p className="mt-3 text-muted-foreground">품목과 품목별 상세 정보를 관리할 수 있어요.</p>
+      <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
+        <WorkspaceBreadcrumb current="품목관리" parent="기준정보" />
+        <section>
           <WorkspaceSearch idPrefix="workspace-items-search" onApply={setFilters} />
           {hasError ? <LoadError message="품목을 불러오지 못했어요" /> : (
             <ItemManagement details={visibleDetails} hasFilters={hasFilters} items={visibleItems} />
@@ -190,10 +195,9 @@ export function ToleranceRangesWorkspacePanel({
 
   return (
     <main className="@container/workspace min-h-svh bg-background">
-      <Container className="py-10 @min-[640px]/workspace:py-16" size="full">
-        <section aria-labelledby="workspace-tolerance-ranges-title">
-          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="workspace-tolerance-ranges-title">오차범위관리</h1>
-          <p className="mt-3 text-muted-foreground">품목별 기준 치수 범위와 상한·하한 편차를 관리할 수 있어요.</p>
+      <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
+        <WorkspaceBreadcrumb current="오차범위관리" parent="기준정보" />
+        <section>
           <WorkspaceSearch idPrefix="workspace-tolerance-search" onApply={setFilters} />
           {hasError ? <LoadError message="오차범위를 불러오지 못했어요" /> : (
             <ToleranceRangeManagement
@@ -219,11 +223,10 @@ export function CodesWorkspacePanel({
 }) {
   return (
     <main className="@container/workspace min-h-svh bg-background">
-      <Container className="py-10 @min-[640px]/workspace:py-16" size="full">
-        <section aria-labelledby="workspace-codes-title">
-          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="workspace-codes-title">코드관리</h1>
-          <p className="mt-3 text-muted-foreground">공통으로 사용하는 코드그룹과 상세 코드를 관리할 수 있어요.</p>
-          {hasError ? <LoadError message="코드를 불러오지 못했어요" /> : (
+      <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
+        <WorkspaceBreadcrumb current="코드관리" parent="기준정보" />
+        <section>
+          {hasError ? <LoadError flush message="코드를 불러오지 못했어요" /> : (
             <CodeManagement details={details} groups={groups} />
           )}
         </section>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Container } from "@/components/layout/container";
+import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -94,14 +95,10 @@ export default async function ItemManagementPage({
 
   return (
     <main className="@container/workspace min-h-svh bg-background">
-      <Container className="py-10 @min-[640px]/workspace:py-16" size="full">
-        <section aria-labelledby="item-management-title">
-          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="item-management-title">
-            품목관리
-          </h1>
-          <p className="mt-3 text-muted-foreground">품목과 품목별 상세 정보를 관리할 수 있어요.</p>
-
-          <form className="mt-8 rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-6" method="get">
+      <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
+        <WorkspaceBreadcrumb current="품목관리" parent="기준정보" />
+        <section>
+          <form className="rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-6" method="get">
             <div className="grid gap-4 @min-[768px]/workspace:grid-cols-2 @min-[1024px]/workspace:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
               <div className="space-y-2">
                 <label className="text-sm font-semibold" htmlFor="search-item-code">품목코드</label>

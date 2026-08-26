@@ -3,12 +3,13 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
 import type { ColDef, RowClickedEvent } from "ag-grid-community";
-import { AllCommunityModule, themeQuartz } from "ag-grid-community";
+import { AllCommunityModule } from "ag-grid-community";
 import { AgGridProvider, AgGridReact } from "ag-grid-react";
 import { LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 
 import { deleteToleranceRange, saveToleranceRange } from "./actions";
 import type { ItemToleranceRange, ToleranceActionState, ToleranceItem } from "./types";
@@ -19,20 +20,6 @@ const inputClassName =
   "h-12 w-full rounded-sm border border-input bg-background px-4 text-tabular outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
 const textareaClassName =
   "min-h-24 w-full resize-y rounded-sm border border-input bg-background px-4 py-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
-
-const gridTheme = themeQuartz.withParams({
-  accentColor: "var(--primary)",
-  backgroundColor: "var(--background)",
-  borderColor: "var(--border)",
-  foregroundColor: "var(--foreground)",
-  fontFamily: "var(--font-pretendard), sans-serif",
-  fontSize: 14,
-  headerBackgroundColor: "var(--muted)",
-  headerFontWeight: 600,
-  rowHoverColor: "var(--accent)",
-  spacing: 7,
-  wrapperBorderRadius: 0,
-});
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 4 }).format(value);
@@ -64,15 +51,15 @@ const rangeColumns: ColDef<ItemToleranceRange>[] = [
     valueFormatter: ({ value }) => formatNumber(value),
   },
   {
-    field: "upper_deviation",
-    headerName: "상한 편차 (mm)",
+    field: "lower_deviation",
+    headerName: "하한 편차 (mm)",
     minWidth: 145,
     flex: 1,
     valueFormatter: ({ value }) => formatDeviation(value),
   },
   {
-    field: "lower_deviation",
-    headerName: "하한 편차 (mm)",
+    field: "upper_deviation",
+    headerName: "상한 편차 (mm)",
     minWidth: 145,
     flex: 1,
     valueFormatter: ({ value }) => formatDeviation(value),
@@ -109,12 +96,16 @@ function NumberField({
   id,
   label,
   name,
+  onValueChange,
+  value,
 }: {
   defaultValue?: number;
   error?: string;
   id: string;
   label: string;
   name: string;
+  onValueChange?: (value: string) => void;
+  value?: string;
 }) {
   const errorId = `${id}-error`;
   return (
@@ -124,10 +115,12 @@ function NumberField({
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
         className={inputClassName}
-        defaultValue={defaultValue}
         id={id}
         inputMode="decimal"
         name={name}
+        {...(value !== undefined
+          ? { onChange: (event: React.ChangeEvent<HTMLInputElement>) => onValueChange?.(event.target.value), value }
+          : { defaultValue })}
         required
         step="0.0001"
         type="number"
@@ -149,6 +142,8 @@ function RangeEditor({
   range: ItemToleranceRange | null;
 }) {
   const [state, formAction, pending] = useActionState(saveToleranceRange, initialActionState);
+  const [lowerDeviation, setLowerDeviation] = useState(() => range ? String(range.lower_deviation) : "");
+  const [upperDeviation, setUpperDeviation] = useState(() => range ? String(range.upper_deviation) : "");
   useEffect(() => {
     if (state.status === "success") onOpenChange(false);
   }, [onOpenChange, state.status]);
@@ -172,11 +167,21 @@ function RangeEditor({
               <div className="grid gap-4 sm:grid-cols-2">
                 <NumberField defaultValue={range?.nominal_min} error={state.errors?.nominalMin} id="nominal-min" label="기준 치수 하한 초과 (mm)" name="nominalMin" />
                 <NumberField defaultValue={range?.nominal_max} error={state.errors?.nominalMax} id="nominal-max" label="기준 치수 상한 이하 (mm)" name="nominalMax" />
-                <NumberField defaultValue={range?.upper_deviation} error={state.errors?.upperDeviation} id="upper-deviation" label="상한 편차 (mm)" name="upperDeviation" />
-                <NumberField defaultValue={range?.lower_deviation} error={state.errors?.lowerDeviation} id="lower-deviation" label="하한 편차 (mm)" name="lowerDeviation" />
+                <NumberField
+                  error={state.errors?.lowerDeviation}
+                  id="lower-deviation"
+                  label="하한 편차 (mm)"
+                  name="lowerDeviation"
+                  onValueChange={(nextValue) => {
+                    setLowerDeviation(nextValue);
+                    setUpperDeviation(nextValue.startsWith("-") ? nextValue.slice(1) : nextValue);
+                  }}
+                  value={lowerDeviation}
+                />
+                <NumberField error={state.errors?.upperDeviation} id="upper-deviation" label="상한 편차 (mm)" name="upperDeviation" onValueChange={setUpperDeviation} value={upperDeviation} />
               </div>
               <p className="text-sm text-muted-foreground">
-                양수는 0.1, 음수는 -0.05처럼 입력해 주세요. 목록에서는 양수에 + 부호를 표시해요.
+                하한 편차를 입력하면 절댓값이 상한 편차에 자동 입력돼요. 상한 편차는 필요하면 직접 수정할 수 있어요.
               </p>
               <div className="space-y-2">
                 <label className="font-semibold" htmlFor="tolerance-note">비고</label>
@@ -298,11 +303,12 @@ export function ToleranceRangeManagement({
                 <AgGridReact
                   columnDefs={itemColumns}
                   defaultColDef={defaultColDef}
-                  getRowClass={({ data }) => data?.seq === effectiveItemSeq ? "!bg-accent" : undefined}
                   getRowId={({ data }) => String(data.seq)}
                   onRowClicked={selectItem}
+                  onRowDataUpdated={({ api }) => syncSelectedGridRow(api, effectiveItemSeq)}
                   rowData={items}
-                  theme={gridTheme}
+                  rowSelection={appGridSingleRowSelection}
+                  theme={appGridTheme}
                 />
               </AgGridProvider>
             </div>
@@ -355,11 +361,12 @@ export function ToleranceRangeManagement({
                 <AgGridReact
                   columnDefs={rangeColumns}
                   defaultColDef={defaultColDef}
-                  getRowClass={({ data }) => data?.seq === selectedRangeSeq ? "!bg-accent" : undefined}
                   getRowId={({ data }) => String(data.seq)}
                   onRowClicked={(event: RowClickedEvent<ItemToleranceRange>) => event.data && setSelectedRangeSeq(event.data.seq)}
+                  onRowDataUpdated={({ api }) => syncSelectedGridRow(api, selectedRangeSeq)}
                   rowData={visibleRanges}
-                  theme={gridTheme}
+                  rowSelection={appGridSingleRowSelection}
+                  theme={appGridTheme}
                 />
               </AgGridProvider>
             </div>

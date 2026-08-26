@@ -1,5 +1,6 @@
 export const appTabs = [
-  { href: "/inspection-reports", label: "검사성적서" },
+  { href: "/inspection-reports", label: "성적서 관리" },
+  { href: "/inspection-measurements", label: "측정결과 입력" },
   { href: "/master/items", label: "품목관리" },
   { href: "/master/tolerance-ranges", label: "오차범위관리" },
   { href: "/master/codes", label: "코드관리" },

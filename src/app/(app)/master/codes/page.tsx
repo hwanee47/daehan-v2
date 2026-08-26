@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { Container } from "@/components/layout/container";
+import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { createClient } from "@/lib/supabase/server";
 
 import { CodeManagement } from "./code-management";
@@ -46,17 +47,11 @@ export default async function CodeManagementPage() {
 
   return (
     <main className="@container/workspace min-h-svh bg-background">
-      <Container className="py-10 @min-[640px]/workspace:py-16" size="full">
-        <section aria-labelledby="code-management-title">
-          <h1 className="text-3xl font-semibold tracking-tight @min-[640px]/workspace:text-4xl" id="code-management-title">
-            코드관리
-          </h1>
-          <p className="mt-3 text-muted-foreground">
-            공통으로 사용하는 코드그룹과 상세 코드를 관리할 수 있어요.
-          </p>
-
+      <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
+        <WorkspaceBreadcrumb current="코드관리" parent="기준정보" />
+        <section>
           {loadError ? (
-            <div className="mt-8 rounded-3xl border border-border bg-card p-6" role="alert">
+            <div className="rounded-3xl border border-border bg-card p-6" role="alert">
               <h2 className="text-lg font-semibold">코드를 불러오지 못했어요</h2>
               <p className="mt-2 text-muted-foreground">잠시 후 다시 시도해 주세요.</p>
             </div>
