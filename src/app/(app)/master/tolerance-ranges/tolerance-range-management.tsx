@@ -266,7 +266,7 @@ export function ToleranceRangeManagement({
   const [selectedItemSeq, setSelectedItemSeq] = useState<number | null>(items[0]?.seq ?? null);
   const [selectedRangeSeq, setSelectedRangeSeq] = useState<number | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ItemToleranceRange | null>(null);
   const [editingRange, setEditingRange] = useState<ItemToleranceRange | null>(null);
 
   const effectiveItemSeq = items.some((item) => item.seq === selectedItemSeq)
@@ -345,7 +345,7 @@ export function ToleranceRangeManagement({
           >
             <Pencil aria-hidden="true" />수정
           </Button>
-          <Button disabled={!selectedRange} onClick={() => setDeleteOpen(true)} size="sm" type="button" variant="destructive">
+          <Button disabled={!selectedRange} onClick={() => setDeleteTarget(selectedRange)} size="sm" type="button" variant="destructive">
             <Trash2 aria-hidden="true" />삭제
           </Button>
         </div>
@@ -383,12 +383,12 @@ export function ToleranceRangeManagement({
           range={editingRange}
         />
       ) : null}
-      {selectedRange ? (
+      {deleteTarget ? (
         <DeleteRangeDialog
-          key={`range-delete-${selectedRange.seq}-${deleteOpen}`}
-          onOpenChange={setDeleteOpen}
-          open={deleteOpen}
-          range={selectedRange}
+          key={`range-delete-${deleteTarget.seq}`}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          open
+          range={deleteTarget}
         />
       ) : null}
     </div>

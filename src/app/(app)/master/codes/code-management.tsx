@@ -403,8 +403,8 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
   const [editingGroup, setEditingGroup] = useState<CodeGroup | null>(null);
   const [detailEditorOpen, setDetailEditorOpen] = useState(false);
   const [editingDetail, setEditingDetail] = useState<CodeDetail | null>(null);
-  const [groupDeleteOpen, setGroupDeleteOpen] = useState(false);
-  const [detailDeleteOpen, setDetailDeleteOpen] = useState(false);
+  const [groupDeleteTarget, setGroupDeleteTarget] = useState<CodeGroup | null>(null);
+  const [detailDeleteTarget, setDetailDeleteTarget] = useState<CodeDetail | null>(null);
 
   const effectiveGroupSeq = groups.some((group) => group.seq === selectedGroupSeq)
     ? selectedGroupSeq
@@ -467,7 +467,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
               seq={selectedGroup.seq}
             />
           ) : null}
-          <Button disabled={!selectedGroup} onClick={() => setGroupDeleteOpen(true)} size="sm" type="button" variant="destructive">
+          <Button disabled={!selectedGroup} onClick={() => setGroupDeleteTarget(selectedGroup)} size="sm" type="button" variant="destructive">
             <Trash2 aria-hidden="true" /> 삭제
           </Button>
         </div>
@@ -538,7 +538,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
               seq={selectedDetail.seq}
             />
           ) : null}
-          <Button disabled={!selectedDetail} onClick={() => setDetailDeleteOpen(true)} size="sm" type="button" variant="destructive">
+          <Button disabled={!selectedDetail} onClick={() => setDetailDeleteTarget(selectedDetail)} size="sm" type="button" variant="destructive">
             <Trash2 aria-hidden="true" /> 삭제
           </Button>
         </div>
@@ -586,24 +586,24 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
           open={detailEditorOpen}
         />
       ) : null}
-      {selectedGroup ? (
+      {groupDeleteTarget ? (
         <DeleteDialog
           action={deleteCodeGroup}
-          itemName={`코드그룹 “${selectedGroup.group_name}”`}
-          key={`group-delete-${selectedGroup.seq}-${groupDeleteOpen}`}
-          onOpenChange={setGroupDeleteOpen}
-          open={groupDeleteOpen}
-          seq={selectedGroup.seq}
+          itemName={`코드그룹 “${groupDeleteTarget.group_name}”`}
+          key={`group-delete-${groupDeleteTarget.seq}`}
+          onOpenChange={(open) => { if (!open) setGroupDeleteTarget(null); }}
+          open
+          seq={groupDeleteTarget.seq}
         />
       ) : null}
-      {selectedDetail ? (
+      {detailDeleteTarget ? (
         <DeleteDialog
           action={deleteCodeDetail}
-          itemName={`상세 코드 “${selectedDetail.code_name}”`}
-          key={`detail-delete-${selectedDetail.seq}-${detailDeleteOpen}`}
-          onOpenChange={setDetailDeleteOpen}
-          open={detailDeleteOpen}
-          seq={selectedDetail.seq}
+          itemName={`상세 코드 “${detailDeleteTarget.code_name}”`}
+          key={`detail-delete-${detailDeleteTarget.seq}`}
+          onOpenChange={(open) => { if (!open) setDetailDeleteTarget(null); }}
+          open
+          seq={detailDeleteTarget.seq}
         />
       ) : null}
     </div>

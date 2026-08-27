@@ -546,8 +546,8 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
   const [selectedDetailSeq, setSelectedDetailSeq] = useState<number | null>(null);
   const [itemEditorOpen, setItemEditorOpen] = useState(false);
   const [detailEditorOpen, setDetailEditorOpen] = useState(false);
-  const [itemDeleteOpen, setItemDeleteOpen] = useState(false);
-  const [detailDeleteOpen, setDetailDeleteOpen] = useState(false);
+  const [itemDeleteTarget, setItemDeleteTarget] = useState<Item | null>(null);
+  const [detailDeleteTarget, setDetailDeleteTarget] = useState<ItemDetail | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [editingDetail, setEditingDetail] = useState<ItemDetail | null>(null);
   const [imageTarget, setImageTarget] = useState<ImageTarget | null>(null);
@@ -622,7 +622,7 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
         <div className="mt-4 flex min-h-9 flex-wrap gap-2">
           <Button disabled={!selectedItem} onClick={() => { setEditingItem(selectedItem); setItemEditorOpen(true); }} size="sm" type="button" variant="secondary"><Pencil aria-hidden="true" />수정</Button>
           <Button disabled={!selectedItem} onClick={() => selectedItem && openImageManager("item", selectedItem, selectedItem.item_name)} size="sm" type="button" variant="secondary"><ImageIcon aria-hidden="true" />이미지</Button>
-          <Button disabled={!selectedItem} onClick={() => setItemDeleteOpen(true)} size="sm" type="button" variant="destructive"><Trash2 aria-hidden="true" />삭제</Button>
+          <Button disabled={!selectedItem} onClick={() => setItemDeleteTarget(selectedItem)} size="sm" type="button" variant="destructive"><Trash2 aria-hidden="true" />삭제</Button>
         </div>
         {items.length === 0 ? (
           <div className="mt-4 flex h-80 items-center justify-center rounded-2xl bg-muted px-6 text-center text-muted-foreground">{hasFilters ? "조회조건에 맞는 품목이 없어요." : "등록된 품목이 없어요. 품목을 먼저 추가해 주세요."}</div>
@@ -639,7 +639,7 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
         <div className="mt-4 flex min-h-9 flex-wrap gap-2">
           <Button disabled={!selectedDetail} onClick={() => { setEditingDetail(selectedDetail); setDetailEditorOpen(true); }} size="sm" type="button" variant="secondary"><Pencil aria-hidden="true" />수정</Button>
           <Button disabled={!selectedDetail} onClick={() => selectedDetail && openImageManager("itemDetail", selectedDetail, selectedDetail.item_detail_name)} size="sm" type="button" variant="secondary"><ImageIcon aria-hidden="true" />이미지</Button>
-          <Button disabled={!selectedDetail} onClick={() => setDetailDeleteOpen(true)} size="sm" type="button" variant="destructive"><Trash2 aria-hidden="true" />삭제</Button>
+          <Button disabled={!selectedDetail} onClick={() => setDetailDeleteTarget(selectedDetail)} size="sm" type="button" variant="destructive"><Trash2 aria-hidden="true" />삭제</Button>
         </div>
         {!selectedItem ? (
           <div className="mt-4 flex h-80 items-center justify-center rounded-2xl bg-muted px-6 text-center text-muted-foreground">왼쪽에서 품목을 선택해 주세요.</div>
@@ -652,8 +652,8 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
 
       <ItemEditor item={editingItem} key={`item-editor-${editingItem?.seq ?? "new"}-${itemEditorOpen}`} onOpenChange={setItemEditorOpen} open={itemEditorOpen} />
       {selectedItem ? <DetailEditor detail={editingDetail} item={selectedItem} key={`detail-editor-${editingDetail?.seq ?? "new"}-${detailEditorOpen}`} onOpenChange={setDetailEditorOpen} open={detailEditorOpen} /> : null}
-      {selectedItem ? <DeleteDialog action={deleteItem} itemName={`품목 “${selectedItem.item_name}”`} key={`item-delete-${selectedItem.seq}-${itemDeleteOpen}`} onOpenChange={setItemDeleteOpen} open={itemDeleteOpen} seq={selectedItem.seq} /> : null}
-      {selectedDetail ? <DeleteDialog action={deleteItemDetail} itemName={`품목상세 “${selectedDetail.item_detail_name}”`} key={`detail-delete-${selectedDetail.seq}-${detailDeleteOpen}`} onOpenChange={setDetailDeleteOpen} open={detailDeleteOpen} seq={selectedDetail.seq} /> : null}
+      {itemDeleteTarget ? <DeleteDialog action={deleteItem} itemName={`품목 “${itemDeleteTarget.item_name}”`} key={`item-delete-${itemDeleteTarget.seq}`} onOpenChange={(open) => { if (!open) setItemDeleteTarget(null); }} open seq={itemDeleteTarget.seq} /> : null}
+      {detailDeleteTarget ? <DeleteDialog action={deleteItemDetail} itemName={`품목상세 “${detailDeleteTarget.item_detail_name}”`} key={`detail-delete-${detailDeleteTarget.seq}`} onOpenChange={(open) => { if (!open) setDetailDeleteTarget(null); }} open seq={detailDeleteTarget.seq} /> : null}
       {detailViewTarget ? <RecordDetailDialog onClose={() => setDetailViewTarget(null)} target={detailViewTarget} /> : null}
       {imageTarget ? (
         <ImageManagerDialog

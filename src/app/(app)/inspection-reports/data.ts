@@ -21,7 +21,7 @@ export async function getInspectionReportData(): Promise<InspectionReportData> {
       supabase.from("inspection_report_items").select("seq, sort_order, inspection_report_seq, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio").order("inspection_report_seq").order("sort_order"),
       supabase.from("inspection_report_measurements").select("seq, inspection_report_seq, inspection_report_item_seq, result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10, note").order("inspection_report_seq").order("inspection_report_item_seq"),
       supabase.from("item_details").select("seq, item_detail_code, item_detail_name, material, image_path, items!inner(item_name, model_name)").order("item_detail_code"),
-      supabase.from("code_details").select("seq, code, code_name, code_groups!inner(group_code)").eq("is_active", true).in("code_groups.group_code", ["U0002", "FINAL_JUDGMENT_STATUS"]).order("sort_order").order("seq"),
+      supabase.from("code_details").select("seq, code, code_name, code_groups!inner(group_code)").eq("is_active", true).in("code_groups.group_code", ["U0001", "U0002", "FINAL_JUDGMENT_STATUS"]).order("sort_order").order("seq"),
     ]);
 
   const errors = [reportsResult.error, itemsResult.error, measurementsResult.error, detailsResult.error, codesResult.error].filter(Boolean);

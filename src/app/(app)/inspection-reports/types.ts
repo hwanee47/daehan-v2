@@ -89,7 +89,7 @@ export type InspectionItemOption = {
 
 export type InspectionCodeOption = {
   seq: number;
-  group_code: "U0002" | "FINAL_JUDGMENT_STATUS";
+  group_code: "U0001" | "U0002" | "FINAL_JUDGMENT_STATUS";
   code: string;
   code_name: string;
 };

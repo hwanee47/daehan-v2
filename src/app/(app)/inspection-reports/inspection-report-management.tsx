@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { deleteInspectionReport, saveInspectionReport } from "./actions";
 import { InspectionMarkerImage, type InspectionMarker } from "./inspection-marker-image";
 import { InspectionMarkerPositionDialog } from "./inspection-marker-position-dialog";
+import { ItemDetailCombobox } from "./item-detail-combobox";
+import { PartyAutocomplete } from "./party-autocomplete";
 import type { InspectionReport, InspectionReportActionState, InspectionReportData, InspectionReportDraftItem } from "./types";
 
 const initialActionState: InspectionReportActionState = { status: "idle" };
@@ -71,6 +73,7 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
   }, [data.items, data.measurements, report]);
   const [rows, setRows] = useState<InspectionReportDraftItem[]>(initialItems);
   const selectedItem = data.itemOptions.find((item) => item.seq === Number(itemDetailSeq));
+  const partyOptions = data.codes.filter((code) => code.group_code === "U0001");
   const productTypes = data.codes.filter((code) => code.group_code === "U0002");
   const markers = rows.flatMap((row, index) => row.markerXRatio === null || row.markerYRatio === null ? [] : [{ x: row.markerXRatio, y: row.markerYRatio, label: index + 1 }]);
 
@@ -103,12 +106,25 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
               <section aria-labelledby="report-editor-tab-basic" className={cn("mx-auto max-w-6xl", editorStep !== "basic" && "hidden")} id="report-editor-basic" role="tabpanel">
                 <div className="mb-5 flex items-center justify-between gap-3"><div><h3 className="font-semibold">성적서 기본정보</h3><p className="mt-1 text-sm text-muted-foreground">품목상세를 선택하고 필요한 정보만 입력해요.</p></div><Button onClick={() => setEditorStep("items")} type="button" variant="secondary">다음: 검사항목</Button></div>
                 <div className="grid gap-4 rounded-2xl bg-muted/40 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
-                  <Field className="sm:col-span-2 lg:col-span-3" label="품목상세"><Select aria-label="품목상세" className="h-11" name="itemDetailSeq" onValueChange={(next) => { if (next !== itemDetailSeq) setRows((current) => current.map((row) => ({ ...row, markerXRatio: null, markerYRatio: null }))); setItemDetailSeq(next); }} options={[{ label: "품목상세를 선택해 주세요", value: "" }, ...data.itemOptions.map((item) => ({ label: `${item.item_detail_code} · ${item.item_detail_name}`, value: String(item.seq) }))]} value={itemDetailSeq} /></Field>
+                  <div className="grid gap-2 text-sm font-semibold sm:col-span-2 lg:col-span-3">
+                    <label htmlFor="report-item-detail">품목상세</label>
+                    <ItemDetailCombobox
+                      id="report-item-detail"
+                      onValueChange={(next) => {
+                        if (next !== itemDetailSeq) {
+                          setRows((current) => current.map((row) => ({ ...row, markerXRatio: null, markerYRatio: null })));
+                        }
+                        setItemDetailSeq(next);
+                      }}
+                      options={data.itemOptions}
+                      value={itemDetailSeq}
+                    />
+                  </div>
                   <Field label="기종"><input className={cn(inputClass, "bg-muted")} readOnly value={selectedItem?.model_name ?? report?.model_name ?? ""} /></Field>
                   <Field label="품명"><input className={cn(inputClass, "bg-muted")} readOnly value={selectedItem?.item_name ?? ""} /></Field>
                   <Field label="재질"><input className={cn(inputClass, "bg-muted")} readOnly value={selectedItem?.material ?? ""} /></Field>
-                  <Field label="고객명"><input className={inputClass} defaultValue={report?.customer_name ?? ""} maxLength={100} name="customerName" /></Field>
-                  <Field label="업체명"><input className={inputClass} defaultValue={report?.supplier_name ?? ""} maxLength={100} name="supplierName" /></Field>
+                  <Field label="고객명"><PartyAutocomplete ariaLabel="고객명" defaultValue={report?.customer_name ?? ""} name="customerName" options={partyOptions} /></Field>
+                  <Field label="업체명"><PartyAutocomplete ariaLabel="업체명" defaultValue={report?.supplier_name ?? ""} name="supplierName" options={partyOptions} /></Field>
                   <Field label="납품수량"><input className={inputClass} defaultValue={report?.delivery_quantity ?? ""} min={1} name="deliveryQuantity" type="number" /></Field>
                   <Field label="시료수"><input className={inputClass} max={10} min={1} name="sampleCount" type="number" value={sampleCount} onChange={(event) => setSampleCount(event.target.value)} /></Field>
                   <Field label="제품구분"><Select aria-label="제품구분" className="h-11" name="productTypeCodeSeq" onValueChange={setProductTypeCodeSeq} options={[{ label: "선택 안 함", value: "" }, ...productTypes.map((code) => ({ label: code.code_name, value: String(code.seq) }))]} value={productTypeCodeSeq} /></Field>
