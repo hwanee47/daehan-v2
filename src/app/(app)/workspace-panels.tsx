@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { InspectionReportManagement } from "./inspection-reports/inspection-report-management";
 import type { InspectionReportData } from "./inspection-reports/types";
 import { InspectionMeasurementSheet } from "./inspection-measurements/inspection-measurement-sheet";
+import { InspectionMeasurementHistory } from "./inspection-measurement-history/inspection-measurement-history";
+import type { MeasurementHistoryPage } from "./inspection-measurement-history/types";
 import { CodeManagement } from "./master/codes/code-management";
 import type { CodeDetail, CodeGroup } from "./master/codes/types";
 import { ItemManagement } from "./master/items/item-management";
@@ -128,7 +130,11 @@ export function InspectionReportsWorkspacePanel({ data }: { data: InspectionRepo
 }
 
 export function InspectionMeasurementsWorkspacePanel({ data }: { data: InspectionReportData }) {
-  return <main className="@container/workspace min-h-svh bg-background"><Container className="py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current="측정결과 입력" parent="검사성적서" /><section><InspectionMeasurementSheet data={data} /></section></Container></main>;
+  return <main className="@container/workspace min-h-svh bg-background"><Container className="py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current="결과 입력" parent="검사성적서" /><section><InspectionMeasurementSheet data={data} showModeTabs={false} /></section></Container></main>;
+}
+
+export function InspectionMeasurementHistoryWorkspacePanel({ data, initialHistory }: { data: InspectionReportData; initialHistory: MeasurementHistoryPage }) {
+  return <main className="@container/workspace min-h-svh bg-background"><Container className="py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current="측정 이력" parent="검사성적서" /><section><InspectionMeasurementHistory data={data} initialHistory={initialHistory} /></section></Container></main>;
 }
 
 export function ItemsWorkspacePanel({

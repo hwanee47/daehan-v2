@@ -41,6 +41,42 @@ export type InspectionReportMeasurement = {
   note: string | null;
 };
 
+export type InspectionMeasurementRun = {
+  seq: number;
+  inspection_report_seq: number;
+  run_no: number;
+  event_type: "save" | "print" | "migration";
+  model_name: string;
+  item_detail_seq: number;
+  item_detail_code: string;
+  item_detail_name: string | null;
+  item_name: string | null;
+  customer_name: string | null;
+  supplier_name: string | null;
+  delivery_quantity: number | null;
+  sample_count: number | null;
+  product_type_code_seq: number | null;
+  product_type_code: string | null;
+  product_type_name: string | null;
+  material: string | null;
+  hardness: string | null;
+  heat_treatment: string | null;
+  image_path: string | null;
+  image_url: string | null;
+  created_at: string;
+};
+
+export type InspectionMeasurementRunItem = Omit<InspectionReportMeasurement, "inspection_report_seq" | "inspection_report_item_seq"> & {
+  measurement_run_seq: number;
+  source_report_item_seq: number | null;
+  sort_order: number;
+  nominal_dimension: number;
+  tolerance_min: number;
+  tolerance_max: number;
+  marker_x_ratio: number | null;
+  marker_y_ratio: number | null;
+};
+
 export type InspectionItemOption = {
   seq: number;
   item_detail_code: string;
@@ -53,7 +89,7 @@ export type InspectionItemOption = {
 
 export type InspectionCodeOption = {
   seq: number;
-  group_code: "PRODUCT_TYPE" | "FINAL_JUDGMENT_STATUS";
+  group_code: "U0002" | "FINAL_JUDGMENT_STATUS";
   code: string;
   code_name: string;
 };
@@ -62,6 +98,8 @@ export type InspectionReportData = {
   reports: InspectionReport[];
   items: InspectionReportItem[];
   measurements: InspectionReportMeasurement[];
+  measurementRuns: InspectionMeasurementRun[];
+  measurementRunItems: InspectionMeasurementRunItem[];
   itemOptions: InspectionItemOption[];
   codes: InspectionCodeOption[];
   hasError: boolean;
@@ -71,6 +109,8 @@ export type InspectionReportActionState = {
   status: "idle" | "error" | "success";
   message?: string;
   reportSeq?: number;
+  runSeq?: number;
+  eventType?: "save" | "print";
 };
 
 export type InspectionReportDraftItem = {

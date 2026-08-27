@@ -116,7 +116,7 @@ export async function saveInspectionReport(
     if (structureChanged && hasResults) return mutationError("측정결과가 입력된 성적서는 검사항목 구조를 변경할 수 없어요.");
     replaceItems = structureChanged;
     const { error } = await supabase.from("inspection_reports").update(masterValues).eq("seq", seq);
-    if (error) { console.error("Failed to update inspection report", { code: error.code }); return mutationError(); }
+    if (error) { console.error("Failed to update inspection report", { code: error.code }); return mutationError(error.code === "23514" ? "제품구분 코드를 확인해 주세요." : undefined); }
     if (replaceItems) {
       const { error: deleteError } = await supabase.from("inspection_report_items").delete().eq("inspection_report_seq", seq);
       if (deleteError) { console.error("Failed to replace inspection report items", { code: deleteError.code }); return mutationError("기본정보는 수정됐지만 검사항목을 갱신하지 못했어요. 다시 저장해 주세요."); }
@@ -133,7 +133,7 @@ export async function saveInspectionReport(
     }
   } else {
     const { data, error } = await supabase.from("inspection_reports").insert(masterValues).select("seq").single();
-    if (error || !data) { console.error("Failed to create inspection report", { code: error?.code }); return mutationError(); }
+    if (error || !data) { console.error("Failed to create inspection report", { code: error?.code }); return mutationError(error?.code === "23514" ? "제품구분 코드를 확인해 주세요." : undefined); }
     reportSeq = data.seq;
   }
 
@@ -206,30 +206,49 @@ export async function saveInspectionMeasurements(
   formData: FormData,
 ): Promise<InspectionReportActionState> {
   const reportSeq = positiveInteger(text(formData, "reportSeq"));
+  const productTypeCodeText = text(formData, "productTypeCodeSeq");
+  const productTypeCodeSeq = optionalPositiveInteger(productTypeCodeText);
+  const eventType = text(formData, "eventType") === "print" ? "print" : "save";
   const rows = parseItems(text(formData, "items"));
-  if (!reportSeq || !rows) return mutationError("측정할 성적서와 결과를 확인해 주세요.");
+  if (!reportSeq || !rows || productTypeCodeText && !productTypeCodeSeq) return mutationError("측정할 성적서와 제품구분, 결과를 확인해 주세요.");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return mutationError("로그인이 필요해요.");
   const { data: report } = await supabase.from("inspection_reports").select("sample_count").eq("seq", reportSeq).maybeSingle();
   if (!report) return mutationError("측정할 성적서를 다시 확인해 주세요.");
+  if (productTypeCodeSeq) {
+    const { data: productType, error: productTypeError } = await supabase.from("code_details").select("seq, code_groups!inner(group_code)").eq("seq", productTypeCodeSeq).eq("is_active", true).eq("code_groups.group_code", "U0002").maybeSingle();
+    if (productTypeError || !productType) return mutationError("제품구분을 다시 선택해 주세요.");
+  }
   const results = rows.map((row) => row.results.map(optionalNumeric));
   if (rows.some((row) => row.note.length > 500)) {
     return mutationError("측정결과와 비고를 다시 확인해 주세요.");
   }
 
-  for (let index = 0; index < rows.length; index += 1) {
-    const itemSeq = rows[index].seq;
-    if (!itemSeq) return mutationError("검사항목을 다시 불러와 주세요.");
+  const payload = rows.map((row, index) => {
+    if (!row.seq) return null;
     const values = results[index];
-    const { error } = await supabase.from("inspection_report_measurements").update({
-      result_1: values[0], result_2: values[1], result_3: values[2], result_4: values[3], result_5: values[4], result_6: values[5], result_7: values[6], result_8: values[7], result_9: values[8], result_10: values[9], note: rows[index].note.trim() || null,
-    }).eq("inspection_report_seq", reportSeq).eq("inspection_report_item_seq", itemSeq);
-    if (error) { console.error("Failed to save measurement", { code: error.code }); return mutationError("일부 측정결과를 저장하지 못했어요. 다시 시도해 주세요."); }
+    return {
+      item_seq: row.seq,
+      result_1: values[0], result_2: values[1], result_3: values[2], result_4: values[3], result_5: values[4],
+      result_6: values[5], result_7: values[6], result_8: values[7], result_9: values[8], result_10: values[9],
+      note: row.note.trim() || null,
+    };
+  });
+  if (payload.some((row) => row === null)) return mutationError("검사항목을 다시 불러와 주세요.");
+  const { data: runSeq, error } = await supabase.rpc("save_inspection_measurement_run", {
+    p_inspection_report_seq: reportSeq,
+    p_product_type_code_seq: productTypeCodeSeq,
+    p_event_type: eventType,
+    p_rows: payload,
+  });
+  if (error || typeof runSeq !== "number") {
+    console.error("Failed to save measurement run", { code: error?.code });
+    return mutationError(error?.code === "23514" ? "제품구분 코드가 올바르지 않아요." : "측정결과 이력을 저장하지 못했어요. 다시 시도해 주세요.");
   }
   revalidatePath(inspectionReportsPath);
   revalidatePath(inspectionMeasurementsPath);
   revalidatePath("/", "layout");
-  return { status: "success", message: "측정결과를 저장했어요.", reportSeq };
+  return { status: "success", message: eventType === "print" ? "인쇄 이력을 저장했어요." : "측정결과와 이력을 저장했어요.", reportSeq, runSeq, eventType };
 }
