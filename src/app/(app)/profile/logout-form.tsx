@@ -1,9 +1,11 @@
 "use client";
 
 import { LogOut } from "lucide-react";
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useUiStore } from "@/stores/ui-store";
 
 import { logout, type LogoutState } from "./actions";
 
@@ -13,6 +15,16 @@ const initialState: LogoutState = {
 
 export function LogoutForm() {
   const [state, formAction, isPending] = useActionState(logout, initialState);
+  const router = useRouter();
+  const closeAllTabs = useUiStore((uiState) => uiState.closeAllTabs);
+
+  useEffect(() => {
+    if (state.status !== "success") return;
+
+    useUiStore.persist.clearStorage();
+    closeAllTabs();
+    router.replace("/login");
+  }, [closeAllTabs, router, state.status]);
 
   return (
     <form action={formAction} className="mt-8">

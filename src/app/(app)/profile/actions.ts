@@ -1,11 +1,9 @@
 "use server";
 
-import { redirect } from "next/navigation";
-
 import { createClient } from "@/lib/supabase/server";
 
 export type LogoutState = {
-  status: "idle" | "error";
+  status: "idle" | "error" | "success";
   message?: string;
 };
 
@@ -18,7 +16,7 @@ export async function logout(_previousState: LogoutState): Promise<LogoutState> 
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    return { status: "success" };
   }
 
   const { error } = await supabase.auth.signOut();
@@ -35,5 +33,5 @@ export async function logout(_previousState: LogoutState): Promise<LogoutState> 
     };
   }
 
-  redirect("/login");
+  return { status: "success" };
 }

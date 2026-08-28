@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useUiStore } from "@/stores/ui-store";
 
 import { login, type LoginState } from "./actions";
 
@@ -14,6 +15,18 @@ const inputClassName =
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState(login, initialLoginState);
+  const closeAllTabs = useUiStore((uiState) => uiState.closeAllTabs);
+
+  useEffect(() => {
+    useUiStore.persist.clearStorage();
+    closeAllTabs();
+
+    if (useUiStore.persist.hasHydrated()) return;
+    return useUiStore.persist.onFinishHydration(() => {
+      useUiStore.persist.clearStorage();
+      closeAllTabs();
+    });
+  }, [closeAllTabs]);
 
   return (
     <form action={formAction} className="space-y-5" noValidate>
