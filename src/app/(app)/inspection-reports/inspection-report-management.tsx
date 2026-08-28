@@ -3,18 +3,19 @@
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
 import { Expand, FilePlus2, MapPin, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-import { deleteInspectionReport, saveInspectionReport } from "./actions";
+import { deleteInspectionReport, getInspectionToleranceRanges, saveInspectionReport } from "./actions";
 import { InspectionMarkerImage, type InspectionMarker } from "./inspection-marker-image";
 import { InspectionMarkerPositionDialog } from "./inspection-marker-position-dialog";
 import { ItemDetailCombobox } from "./item-detail-combobox";
 import { PartyAutocomplete } from "./party-autocomplete";
-import type { InspectionReport, InspectionReportActionState, InspectionReportData, InspectionReportDraftItem } from "./types";
+import { ToleranceAutocomplete } from "./tolerance-autocomplete";
+import type { InspectionReport, InspectionReportActionState, InspectionReportData, InspectionReportDraftItem, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
 
 const initialActionState: InspectionReportActionState = { status: "idle" };
 const inputClass = "h-11 w-full rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20";
@@ -25,6 +26,18 @@ function blankItem(): InspectionReportDraftItem {
 
 function numberText(value: number | null | undefined) {
   return value === null || value === undefined ? "" : String(value);
+}
+
+function firstDimensionNumber(value: string) {
+  const match = value.match(/[-+]?(?:\d+(?:\.\d*)?|\.\d+)/);
+  if (!match) return null;
+  const number = Number(match[0]);
+  return Number.isFinite(number) ? number : null;
+}
+
+function matchingTolerance(ranges: InspectionToleranceRange[], value: string) {
+  const number = firstDimensionNumber(value);
+  return number === null ? null : ranges.find((range) => number > Number(range.nominal_min) && number <= Number(range.nominal_max)) ?? null;
 }
 
 function Field({ children, className, label }: { children: React.ReactNode; className?: string; label: string }) {
@@ -72,15 +85,67 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
     });
   }, [data.items, data.measurements, report]);
   const [rows, setRows] = useState<InspectionReportDraftItem[]>(initialItems);
+  const [toleranceModes, setToleranceModes] = useState<("auto" | "manual")[]>(() => initialItems.map(() => "auto"));
+  const [toleranceResult, setToleranceResult] = useState<InspectionToleranceRangeResult>({ ranges: [], error: null });
+  const [isTolerancePending, startToleranceTransition] = useTransition();
   const selectedItem = data.itemOptions.find((item) => item.seq === Number(itemDetailSeq));
   const partyOptions = data.codes.filter((code) => code.group_code === "U0001");
   const productTypes = data.codes.filter((code) => code.group_code === "U0002");
+  const toleranceCodeNames = data.codes
+    .filter((code) => code.group_code === "U0003")
+    .sort((left, right) => left.code_name.localeCompare(right.code_name, "ko-KR", { numeric: true }))
+    .map((code) => code.code_name);
   const markers = rows.flatMap((row, index) => row.markerXRatio === null || row.markerYRatio === null ? [] : [{ x: row.markerXRatio, y: row.markerYRatio, label: index + 1 }]);
 
   useEffect(() => { if (state.status === "success") onOpenChange(false); }, [onOpenChange, state.status]);
 
+  useEffect(() => {
+    const seq = Number(itemDetailSeq);
+    if (!Number.isSafeInteger(seq) || seq <= 0) return;
+    let cancelled = false;
+    startToleranceTransition(async () => {
+      const result = await getInspectionToleranceRanges(seq);
+      if (!cancelled) {
+        setToleranceResult(result);
+        if (!result.error) setRows((current) => current.map((row) => {
+          if (row.toleranceMin.trim() || row.toleranceMax.trim()) return row;
+          const range = matchingTolerance(result.ranges, row.nominalDimension);
+          return range ? { ...row, toleranceMin: String(range.lower_deviation), toleranceMax: String(range.upper_deviation) } : row;
+        }));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [itemDetailSeq]);
+
   function updateRow(index: number, update: Partial<InspectionReportDraftItem>) {
     setRows((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, ...update } : row));
+  }
+
+  function updateNominalDimension(index: number, value: string) {
+    const row = rows[index];
+    const auto = toleranceModes[index] === "auto" || !row.toleranceMin.trim() && !row.toleranceMax.trim();
+    const range = auto ? matchingTolerance(toleranceResult.ranges, value) : null;
+    updateRow(index, {
+      nominalDimension: value,
+      ...(auto ? { toleranceMin: range ? String(range.lower_deviation) : "", toleranceMax: range ? String(range.upper_deviation) : "" } : {}),
+    });
+    if (auto) setToleranceModes((current) => current.map((mode, rowIndex) => rowIndex === index ? "auto" : mode));
+  }
+
+  function updateTolerance(index: number, key: "toleranceMin" | "toleranceMax", value: string) {
+    const row = rows[index];
+    const nextMin = key === "toleranceMin" ? value : row.toleranceMin;
+    const nextMax = key === "toleranceMax" ? value : row.toleranceMax;
+    updateRow(index, { [key]: value });
+    setToleranceModes((current) => current.map((mode, rowIndex) => rowIndex === index ? !nextMin.trim() && !nextMax.trim() ? "auto" : "manual" : mode));
+  }
+
+  function applyTolerance(index: number, range: InspectionToleranceRange) {
+    updateRow(index, {
+      toleranceMin: String(range.lower_deviation),
+      toleranceMax: String(range.upper_deviation),
+    });
+    setToleranceModes((current) => current.map((mode, rowIndex) => rowIndex === index ? "auto" : mode));
   }
 
   return (
@@ -112,7 +177,8 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
                       id="report-item-detail"
                       onValueChange={(next) => {
                         if (next !== itemDetailSeq) {
-                          setRows((current) => current.map((row) => ({ ...row, markerXRatio: null, markerYRatio: null })));
+                          setRows((current) => current.map((row, index) => ({ ...row, markerXRatio: null, markerYRatio: null, ...(toleranceModes[index] === "auto" ? { toleranceMin: "", toleranceMax: "" } : {}) })));
+                          setToleranceResult({ ranges: [], error: null });
                         }
                         setItemDetailSeq(next);
                       }}
@@ -137,8 +203,8 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
                 <div><h3 className="font-semibold" id="report-drawing-title">도면 / 제품 이미지</h3><p className="mt-1 text-sm text-muted-foreground">등록된 순번 위치를 함께 확인해요.</p><div className="relative mt-3 flex h-[360px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-muted/30 xl:h-[calc(100svh-19rem)] xl:min-h-[360px]">{selectedItem?.image_url ? <><InspectionMarkerImage alt={`${selectedItem.item_detail_name} 이미지`} markers={markers} url={selectedItem.image_url} /><button aria-label="이미지 전체 화면 보기" className="absolute right-3 top-3 z-20 inline-flex size-11 items-center justify-center rounded-full bg-background shadow" onClick={() => setFullscreen(true)} type="button"><Expand aria-hidden="true" /></button></> : <p className="px-5 text-center text-sm text-muted-foreground">기본정보에서 품목상세를 선택해 주세요.</p>}</div></div>
                 <input name="finalJudgmentCodeSeq" type="hidden" value={report?.final_judgment_code_seq ?? ""} />
 
-                <div className="flex min-h-0 min-w-0 flex-col"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold" id="measurements-title">검사항목</h3><p className="mt-1 text-sm text-muted-foreground">기준치수와 최소·최대 공차를 입력해요.</p></div><div className="flex flex-wrap gap-2"><Button disabled={!selectedItem?.image_url || rows.length === 0} onClick={() => setMarkerDialogOpen(true)} type="button" variant="secondary"><MapPin aria-hidden="true" />순번 위치 설정</Button><Button onClick={() => setRows((current) => [...current, blankItem()])} type="button" variant="secondary"><Plus aria-hidden="true" />항목 추가</Button></div></div>
-                <div className="mt-3 max-h-[420px] overflow-auto border-y border-border xl:max-h-[calc(100svh-19rem)]"><table className="w-full min-w-[560px] border-collapse text-sm"><thead className="sticky top-0 z-10 bg-muted"><tr><th className="w-14 p-3">순번</th><th className="p-3">기준치수</th><th className="p-3">공차 min</th><th className="p-3">공차 max</th><th className="w-14 p-3"><span className="sr-only">삭제</span></th></tr></thead><tbody>{rows.length ? rows.map((row, rowIndex) => <tr className="border-t border-border bg-background" key={row.seq ?? `new-${rowIndex}`}><td className="p-2 text-center font-medium">{rowIndex + 1}</td>{(["nominalDimension", "toleranceMin", "toleranceMax"] as const).map((key) => <td className="p-1" key={key}><input aria-label={`${rowIndex + 1}번 ${key}`} className={cn(inputClass, "h-10 px-2 text-right tabular-nums")} inputMode="decimal" value={row[key]} onChange={(event) => updateRow(rowIndex, { [key]: event.target.value })} /></td>)}<td className="p-1"><button aria-label={`${rowIndex + 1}번 항목 삭제`} className="inline-flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={() => setRows((current) => current.filter((_, index) => index !== rowIndex))} type="button"><Trash2 aria-hidden="true" size={18} /></button></td></tr>) : <tr><td className="p-8 text-center text-muted-foreground" colSpan={5}>등록된 검사항목이 없어요. 항목 추가를 눌러 시작해 주세요.</td></tr>}</tbody></table></div></div>
+                <div className="flex min-h-0 min-w-0 flex-col"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold" id="measurements-title">검사항목</h3><p className="mt-1 text-sm text-muted-foreground">기준치수의 숫자에 맞는 공차를 자동으로 입력해요.</p><p aria-live="polite" className={cn("mt-1 text-xs", toleranceResult.error ? "text-destructive" : "text-muted-foreground")}>{isTolerancePending ? "오차범위를 불러오는 중이에요." : toleranceResult.error ?? (itemDetailSeq && toleranceResult.ranges.length === 0 ? "등록된 오차범위가 없어 수동으로 입력해 주세요." : "")}</p></div><div className="flex flex-wrap gap-2"><Button disabled={!selectedItem?.image_url || rows.length === 0} onClick={() => setMarkerDialogOpen(true)} type="button" variant="secondary"><MapPin aria-hidden="true" />순번 위치 설정</Button><Button onClick={() => { setRows((current) => [...current, blankItem()]); setToleranceModes((current) => [...current, "auto"]); }} type="button" variant="secondary"><Plus aria-hidden="true" />항목 추가</Button></div></div>
+                <div className="mt-3 max-h-[420px] overflow-auto border-y border-border xl:max-h-[calc(100svh-19rem)]"><table className="w-full min-w-[560px] border-collapse text-sm"><thead className="sticky top-0 z-10 bg-muted"><tr><th className="w-14 p-3">순번</th><th className="p-3">기준치수</th><th className="p-3">공차 min</th><th className="p-3">공차 max</th><th className="w-14 p-3"><span className="sr-only">삭제</span></th></tr></thead><tbody>{rows.length ? rows.map((row, rowIndex) => <tr className="border-t border-border bg-background" key={row.seq ?? `new-${rowIndex}`}><td className="p-2 text-center font-medium">{rowIndex + 1}</td><td className="p-1"><ToleranceAutocomplete codeNames={toleranceCodeNames} onRangeSelect={(range) => applyTolerance(rowIndex, range)} onValueChange={(value) => updateNominalDimension(rowIndex, value)} ranges={toleranceResult.ranges} rowNumber={rowIndex + 1} value={row.nominalDimension} /></td>{(["toleranceMin", "toleranceMax"] as const).map((key) => <td className="p-1" key={key}><input aria-label={`${rowIndex + 1}번 ${key}`} className={cn(inputClass, "h-10 px-2 text-right tabular-nums")} inputMode="decimal" value={row[key]} onChange={(event) => updateTolerance(rowIndex, key, event.target.value)} /></td>)}<td className="p-1"><button aria-label={`${rowIndex + 1}번 항목 삭제`} className="inline-flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={() => { setRows((current) => current.filter((_, index) => index !== rowIndex)); setToleranceModes((current) => current.filter((_, index) => index !== rowIndex)); }} type="button"><Trash2 aria-hidden="true" size={18} /></button></td></tr>) : <tr><td className="p-8 text-center text-muted-foreground" colSpan={5}>등록된 검사항목이 없어요. 항목 추가를 눌러 시작해 주세요.</td></tr>}</tbody></table></div></div>
               </section>
               </div>
 

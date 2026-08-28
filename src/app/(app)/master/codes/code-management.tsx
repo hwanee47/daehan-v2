@@ -53,6 +53,16 @@ const detailColumns: ColDef<CodeDetail>[] = [
 
 const defaultColDef = { resizable: true, sortable: true };
 
+function nextDetailCode(details: CodeDetail[]) {
+  const maximum = details.reduce((current, detail) => {
+    if (!/^\d+$/.test(detail.code)) return current;
+    const number = Number(detail.code);
+    return Number.isSafeInteger(number) ? Math.max(current, number) : current;
+  }, 0);
+
+  return String(maximum + 1).padStart(2, "0");
+}
+
 type ServerFormAction = (
   previousState: CodeActionState,
   formData: FormData,
@@ -218,11 +228,13 @@ function GroupEditor({
 }
 
 function DetailEditor({
+  defaultCode,
   detail,
   group,
   onOpenChange,
   open,
 }: {
+  defaultCode: string;
   detail: CodeDetail | null;
   group: CodeGroup;
   onOpenChange: (open: boolean) => void;
@@ -250,7 +262,7 @@ function DetailEditor({
             aria-describedby={state.errors?.code ? "detail-code-error" : undefined}
             aria-invalid={Boolean(state.errors?.code)}
             className={inputClassName}
-            defaultValue={detail?.code}
+            defaultValue={detail?.code ?? defaultCode}
             id="detail-code"
             maxLength={80}
             name="code"
@@ -415,6 +427,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
     [details, effectiveGroupSeq],
   );
   const selectedDetail = visibleDetails.find((detail) => detail.seq === selectedDetailSeq) ?? null;
+  const nextCode = useMemo(() => nextDetailCode(visibleDetails), [visibleDetails]);
 
   function selectGroup(event: RowClickedEvent<CodeGroup>) {
     if (!event.data) return;
@@ -579,6 +592,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
       />
       {selectedGroup ? (
         <DetailEditor
+          defaultCode={nextCode}
           detail={editingDetail}
           group={selectedGroup}
           key={`detail-editor-${editingDetail?.seq ?? "new"}-${detailEditorOpen}`}

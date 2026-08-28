@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 
-import type { InspectionReportActionState, InspectionReportDraftItem } from "./types";
+import type { InspectionReportActionState, InspectionReportDraftItem, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
 
 const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
@@ -31,6 +31,11 @@ function numeric(value: string) {
 
 function optionalNumeric(value: string) {
   return value.trim() ? numeric(value.trim()) : null;
+}
+
+function firstNumeric(value: string) {
+  const match = value.match(/[-+]?(?:\d+(?:\.\d*)?|\.\d+)/);
+  return match ? numeric(match[0]) : null;
 }
 
 function parseItems(value: string): InspectionReportDraftItem[] | null {
@@ -71,7 +76,7 @@ export async function saveInspectionReport(
   }
 
   const normalizedItems = items.map((item) => ({
-    nominal: numeric(item.nominalDimension),
+    nominal: firstNumeric(item.nominalDimension),
     min: numeric(item.toleranceMin),
     max: numeric(item.toleranceMax),
     markerXRatio: item.markerXRatio,
@@ -182,6 +187,25 @@ export async function saveInspectionReport(
   revalidatePath(inspectionMeasurementsPath);
   revalidatePath("/", "layout");
   return { status: "success", message: seq ? "검사성적서를 수정했어요." : "검사성적서를 등록했어요.", reportSeq: reportSeq ?? undefined };
+}
+
+export async function getInspectionToleranceRanges(itemDetailSeq: number): Promise<InspectionToleranceRangeResult> {
+  if (!Number.isSafeInteger(itemDetailSeq) || itemDetailSeq <= 0) return { ranges: [], error: null };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ranges: [], error: "로그인이 필요해요." };
+
+  const { data: detail, error: detailError } = await supabase.from("item_details").select("item_seq").eq("seq", itemDetailSeq).maybeSingle();
+  if (detailError || !detail) {
+    console.error("Failed to resolve tolerance item", { code: detailError?.code });
+    return { ranges: [], error: "품목의 오차범위를 조회하지 못했어요." };
+  }
+  const { data, error } = await supabase.from("item_tolerance_ranges").select("seq, nominal_min, nominal_max, upper_deviation, lower_deviation").eq("item_seq", detail.item_seq).order("nominal_min");
+  if (error) {
+    console.error("Failed to load inspection tolerance ranges", { code: error.code });
+    return { ranges: [], error: "품목의 오차범위를 조회하지 못했어요." };
+  }
+  return { ranges: (data ?? []) as InspectionToleranceRange[], error: null };
 }
 
 export async function deleteInspectionReport(

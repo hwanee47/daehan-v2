@@ -89,7 +89,7 @@ export type InspectionItemOption = {
 
 export type InspectionCodeOption = {
   seq: number;
-  group_code: "U0001" | "U0002" | "FINAL_JUDGMENT_STATUS";
+  group_code: "U0001" | "U0002" | "U0003" | "FINAL_JUDGMENT_STATUS";
   code: string;
   code_name: string;
 };
@@ -122,4 +122,17 @@ export type InspectionReportDraftItem = {
   note: string;
   markerXRatio: number | null;
   markerYRatio: number | null;
+};
+
+export type InspectionToleranceRange = {
+  seq: number;
+  nominal_min: number;
+  nominal_max: number;
+  upper_deviation: number;
+  lower_deviation: number;
+};
+
+export type InspectionToleranceRangeResult = {
+  ranges: InspectionToleranceRange[];
+  error: string | null;
 };

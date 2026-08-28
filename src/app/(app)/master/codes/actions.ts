@@ -50,9 +50,9 @@ async function getAdminClient() {
   return { error: null, supabase };
 }
 
-function mapMutationError(code?: string, isGroupDelete = false): CodeActionState {
+function mapMutationError(code?: string, isGroupDelete = false, duplicateMessage?: string): CodeActionState {
   if (code === "23505") {
-    return { status: "error", message: "이미 사용 중인 코드예요. 다른 코드를 입력해 주세요." };
+    return { status: "error", message: duplicateMessage ?? "이미 사용 중인 코드예요. 다른 코드를 입력해 주세요." };
   }
 
   if (code === "23503" && isGroupDelete) {
@@ -164,7 +164,7 @@ export async function saveCodeDetail(
 
   if (error) {
     console.error("Failed to save code detail", { code: error.code });
-    return mapMutationError(error.code);
+    return mapMutationError(error.code, false, "코드 또는 코드명이 이미 사용 중이에요. 다른 값을 입력해 주세요.");
   }
 
   revalidatePath(codesPath);
