@@ -3,6 +3,8 @@
 import { Autocomplete } from "@base-ui/react/autocomplete";
 import { useMemo, useState } from "react";
 
+import { WorkspaceAutocompletePortal } from "@/components/ui/workspace-portal";
+
 import type { InspectionToleranceRange } from "./types";
 
 function firstNumber(value: string) {
@@ -84,7 +86,7 @@ export function ToleranceAutocomplete({
         />
       </Autocomplete.InputGroup>
 
-      <Autocomplete.Portal>
+      <WorkspaceAutocompletePortal>
         <Autocomplete.Positioner className="z-[100] outline-none" sideOffset={4}>
           <Autocomplete.Popup className="w-max min-w-[var(--anchor-width)] max-w-[min(36rem,var(--available-width))] origin-[var(--transform-origin)] border border-border bg-popover text-popover-foreground shadow-lg outline-none transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
             <Autocomplete.Empty>
@@ -116,7 +118,7 @@ export function ToleranceAutocomplete({
             </Autocomplete.List>
           </Autocomplete.Popup>
         </Autocomplete.Positioner>
-      </Autocomplete.Portal>
+      </WorkspaceAutocompletePortal>
     </Autocomplete.Root>
   );
 }

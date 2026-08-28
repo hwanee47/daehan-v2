@@ -5,6 +5,8 @@ import { Check, ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+import { WorkspaceSelectPortal } from "./workspace-portal";
+
 export type SelectOption = {
   label: string;
   value: string;
@@ -60,7 +62,7 @@ export function Select({
         </BaseSelect.Icon>
       </BaseSelect.Trigger>
 
-      <BaseSelect.Portal>
+      <WorkspaceSelectPortal>
         <BaseSelect.Positioner
           align="start"
           alignItemWithTrigger={false}
@@ -92,7 +94,7 @@ export function Select({
             </BaseSelect.ScrollDownArrow>
           </BaseSelect.Popup>
         </BaseSelect.Positioner>
-      </BaseSelect.Portal>
+      </WorkspaceSelectPortal>
     </BaseSelect.Root>
   );
 }

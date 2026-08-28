@@ -8,7 +8,7 @@ import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { Button } from "@/components/ui/button";
 
 import { InspectionReportManagement } from "./inspection-reports/inspection-report-management";
-import type { InspectionReportData } from "./inspection-reports/types";
+import type { InspectionReportData, InspectionReportPage } from "./inspection-reports/types";
 import { InspectionMeasurementSheet } from "./inspection-measurements/inspection-measurement-sheet";
 import { InspectionMeasurementHistory } from "./inspection-measurement-history/inspection-measurement-history";
 import type { MeasurementHistoryPage } from "./inspection-measurement-history/types";
@@ -116,13 +116,13 @@ function LoadError({ flush = false, message }: { flush?: boolean; message: strin
   );
 }
 
-export function InspectionReportsWorkspacePanel({ data }: { data: InspectionReportData }) {
+export function InspectionReportsWorkspacePanel({ data, initialPage }: { data: InspectionReportData; initialPage: InspectionReportPage }) {
   return (
     <main className="@container/workspace min-h-svh">
       <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
         <WorkspaceBreadcrumb current="성적서 관리" parent="검사성적서" />
         <section>
-          <InspectionReportManagement data={data} />
+          <InspectionReportManagement data={data} initialPage={initialPage} />
         </section>
       </Container>
     </main>

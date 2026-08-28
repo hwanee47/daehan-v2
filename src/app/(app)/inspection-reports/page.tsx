@@ -5,6 +5,7 @@ import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { createClient } from "@/lib/supabase/server";
 
 import { getInspectionReportData } from "./data";
+import { searchInspectionReports } from "./actions";
 import { InspectionReportManagement } from "./inspection-report-management";
 
 export const metadata: Metadata = {
@@ -16,14 +17,17 @@ export default async function InspectionReportsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const data = await getInspectionReportData();
+  const [data, initialPage] = await Promise.all([
+    getInspectionReportData(),
+    searchInspectionReports({ searchField: "all", keyword: "", sortOrder: "newest", page: 1 }),
+  ]);
 
   return (
     <main className="@container/workspace min-h-svh bg-background">
       <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
         <WorkspaceBreadcrumb current="성적서 관리" parent="검사성적서" />
         <section>
-          <InspectionReportManagement data={data} />
+          <InspectionReportManagement data={data} initialPage={initialPage} />
         </section>
       </Container>
     </main>

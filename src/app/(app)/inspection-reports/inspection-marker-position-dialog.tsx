@@ -5,6 +5,7 @@ import { Check, RotateCcw, Undo2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import { cn } from "@/lib/utils";
 
 import { InspectionMarkerImage } from "./inspection-marker-image";
@@ -56,7 +57,7 @@ export function InspectionMarkerPositionDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
+      <WorkspaceDialogPortal>
         <Dialog.Backdrop className="fixed inset-0 z-[80] bg-foreground/40 backdrop-blur-[2px]" />
         <Dialog.Viewport className="fixed inset-0 z-[80] overflow-y-auto p-3 sm:p-6">
           <Dialog.Popup className="mx-auto flex min-h-[calc(100svh-1.5rem)] w-full max-w-[1500px] flex-col rounded-3xl border border-border bg-card p-4 shadow-xl outline-none sm:min-h-0 sm:h-[calc(100svh-3rem)] sm:p-6">
@@ -81,7 +82,7 @@ export function InspectionMarkerPositionDialog({
             <div className="mt-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">설정하지 않은 항목은 이미지에 번호가 표시되지 않아요.</p><div className="flex gap-2"><Dialog.Close className="inline-flex h-11 items-center rounded-xl bg-secondary px-5 font-semibold">취소</Dialog.Close><Button onClick={() => { onApply(positions); onOpenChange(false); }} type="button">설정 완료</Button></div></div>
           </Dialog.Popup>
         </Dialog.Viewport>
-      </Dialog.Portal>
+      </WorkspaceDialogPortal>
     </Dialog.Root>
   );
 }

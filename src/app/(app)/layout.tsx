@@ -4,6 +4,7 @@ import type { AppTabHref } from "@/lib/app-tabs";
 import { createClient } from "@/lib/supabase/server";
 
 import { getInspectionReportData } from "./inspection-reports/data";
+import { searchInspectionReports } from "./inspection-reports/actions";
 import { searchMeasurementHistory } from "./inspection-measurement-history/actions";
 import type { CodeDetail, CodeGroup } from "./master/codes/types";
 import { attachItemImageUrls } from "./master/items/item-image-urls";
@@ -38,12 +39,13 @@ async function getWorkspace() {
     .eq("id", user.id)
     .maybeSingle();
   const allowedTabHrefs: AppTabHref[] = ["/inspection-reports", "/inspection-measurements", "/inspection-measurement-history"];
-  const [inspectionReportData, initialMeasurementHistory] = await Promise.all([
+  const [inspectionReportData, initialInspectionReportPage, initialMeasurementHistory] = await Promise.all([
     getInspectionReportData(),
+    searchInspectionReports({ searchField: "all", keyword: "", sortOrder: "newest", page: 1 }),
     searchMeasurementHistory({ dateFrom: "", dateTo: "", searchField: "", keyword: "", page: 1 }),
   ]);
   const panels: Partial<Record<AppTabHref, React.ReactNode>> = {
-    "/inspection-reports": <InspectionReportsWorkspacePanel data={inspectionReportData} />,
+    "/inspection-reports": <InspectionReportsWorkspacePanel data={inspectionReportData} initialPage={initialInspectionReportPage} />,
     "/inspection-measurements": <InspectionMeasurementsWorkspacePanel data={inspectionReportData} />,
     "/inspection-measurement-history": <InspectionMeasurementHistoryWorkspacePanel data={inspectionReportData} initialHistory={initialMeasurementHistory} />,
   };

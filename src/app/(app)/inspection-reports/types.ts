@@ -105,6 +105,24 @@ export type InspectionReportData = {
   hasError: boolean;
 };
 
+export type InspectionReportSearchField = "all" | "model" | "drawing" | "itemName" | "customer" | "supplier";
+export type InspectionReportSortOrder = "newest" | "oldest";
+
+export type InspectionReportQuery = {
+  searchField: InspectionReportSearchField;
+  keyword: string;
+  sortOrder: InspectionReportSortOrder;
+  page: number;
+};
+
+export type InspectionReportPage = {
+  rows: InspectionReport[];
+  total: number;
+  page: number;
+  pageSize: number;
+  error: string | null;
+};
+
 export type InspectionReportActionState = {
   status: "idle" | "error" | "success";
   message?: string;

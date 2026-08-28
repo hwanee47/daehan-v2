@@ -4,11 +4,60 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 
-import type { InspectionReportActionState, InspectionReportDraftItem, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
+import type { InspectionReport, InspectionReportActionState, InspectionReportDraftItem, InspectionReportPage, InspectionReportQuery, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
 
 const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
 const codeManagementPath = "/master/codes";
+const reportPageSize = 50;
+const reportColumns = "seq, model_name, item_detail_seq, item_detail_code, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, hardness, heat_treatment, final_judgment_code_seq";
+const reportSearchColumns = { model: "model_name", drawing: "item_detail_code", customer: "customer_name", supplier: "supplier_name" } as const;
+
+function safeSearchTerm(value: string) {
+  return value.trim().slice(0, 100).replace(/[,*()"\\]/g, " ").replace(/\s+/g, " ");
+}
+
+export async function searchInspectionReports(query: InspectionReportQuery): Promise<InspectionReportPage> {
+  const page = Number.isInteger(query.page) && query.page > 0 && query.page <= 1_000_000 ? query.page : 1;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { rows: [], total: 0, page, pageSize: reportPageSize, error: "로그인이 필요해요." };
+
+  const keyword = safeSearchTerm(query.keyword);
+  let matchingItemDetailSeqs: number[] = [];
+  if (keyword && (query.searchField === "all" || query.searchField === "itemName")) {
+    const { data, error } = await supabase.from("item_details").select("seq, items!inner(item_name)").ilike("items.item_name", `%${keyword}%`);
+    if (error) {
+      console.error("Failed to resolve report item-name search", { code: error.code });
+      return { rows: [], total: 0, page, pageSize: reportPageSize, error: "검사성적서를 조회하지 못했어요." };
+    }
+    matchingItemDetailSeqs = (data ?? []).map((row) => row.seq);
+  }
+
+  let request = supabase.from("inspection_reports").select(reportColumns, { count: "exact" });
+  if (keyword) {
+    if (query.searchField === "itemName") {
+      if (!matchingItemDetailSeqs.length) return { rows: [], total: 0, page, pageSize: reportPageSize, error: null };
+      request = request.in("item_detail_seq", matchingItemDetailSeqs);
+    } else if (query.searchField === "all") {
+      const filters = ["model_name", "item_detail_code", "customer_name", "supplier_name"].map((column) => `${column}.ilike.*${keyword}*`);
+      if (matchingItemDetailSeqs.length) filters.push(`item_detail_seq.in.(${matchingItemDetailSeqs.join(",")})`);
+      request = request.or(filters.join(","));
+    } else {
+      const column = reportSearchColumns[query.searchField as keyof typeof reportSearchColumns];
+      if (column) request = request.ilike(column, `%${keyword}%`);
+    }
+  }
+
+  const from = (page - 1) * reportPageSize;
+  const ascending = query.sortOrder === "oldest";
+  const { data, error, count } = await request.order("seq", { ascending }).range(from, from + reportPageSize - 1);
+  if (error) {
+    console.error("Failed to search inspection reports", { code: error.code });
+    return { rows: [], total: 0, page, pageSize: reportPageSize, error: "검사성적서를 조회하지 못했어요." };
+  }
+  return { rows: (data ?? []) as InspectionReport[], total: count ?? 0, page, pageSize: reportPageSize, error: null };
+}
 
 function text(formData: FormData, key: string) {
   const value = formData.get(key);

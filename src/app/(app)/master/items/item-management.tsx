@@ -9,6 +9,7 @@ import { ImageIcon, LoaderCircle, Maximize2, Pencil, Plus, Trash2, Upload, X } f
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 import {
@@ -104,7 +105,7 @@ function DialogFrame({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
+      <WorkspaceDialogPortal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" />
         <Dialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
           <Dialog.Popup className="w-full max-w-lg rounded-3xl border border-border bg-card p-5 shadow-xl outline-none sm:p-7">
@@ -113,7 +114,7 @@ function DialogFrame({
             {children}
           </Dialog.Popup>
         </Dialog.Viewport>
-      </Dialog.Portal>
+      </WorkspaceDialogPortal>
     </Dialog.Root>
   );
 }
@@ -224,7 +225,7 @@ function FullscreenImageDialog({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
-      <Dialog.Portal>
+      <WorkspaceDialogPortal>
         <Dialog.Backdrop className="fixed inset-0 z-[60] bg-foreground/90 backdrop-blur-sm" />
         <Dialog.Viewport className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6">
           <Dialog.Popup className="relative size-full outline-none">
@@ -244,7 +245,7 @@ function FullscreenImageDialog({
             </Dialog.Close>
           </Dialog.Popup>
         </Dialog.Viewport>
-      </Dialog.Portal>
+      </WorkspaceDialogPortal>
     </Dialog.Root>
   );
 }
@@ -267,7 +268,7 @@ function RecordDetailDialog({
   return (
     <>
       <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
-        <Dialog.Portal>
+        <WorkspaceDialogPortal>
           <Dialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" />
           <Dialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
             <Dialog.Popup className="w-full max-w-3xl rounded-3xl border border-border bg-card p-5 shadow-xl outline-none sm:p-7">
@@ -313,7 +314,7 @@ function RecordDetailDialog({
               </div>
             </Dialog.Popup>
           </Dialog.Viewport>
-        </Dialog.Portal>
+        </WorkspaceDialogPortal>
       </Dialog.Root>
       {target.imageUrl ? (
         <FullscreenImageDialog
@@ -523,7 +524,7 @@ function DeleteDialog({ action, itemName, onOpenChange, open, seq }: { action: S
 
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
-      <AlertDialog.Portal>
+      <WorkspaceAlertDialogPortal>
         <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" />
         <AlertDialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <AlertDialog.Popup className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl outline-none">
@@ -539,7 +540,7 @@ function DeleteDialog({ action, itemName, onOpenChange, open, seq }: { action: S
             </form>
           </AlertDialog.Popup>
         </AlertDialog.Viewport>
-      </AlertDialog.Portal>
+      </WorkspaceAlertDialogPortal>
     </AlertDialog.Root>
   );
 }

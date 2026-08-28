@@ -9,6 +9,7 @@ import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 
@@ -110,7 +111,7 @@ function DialogFrame({
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
+      <WorkspaceDialogPortal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" />
         <Dialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
           <Dialog.Popup className="w-full max-w-lg rounded-3xl border border-border bg-card p-5 shadow-xl outline-none sm:p-7">
@@ -121,7 +122,7 @@ function DialogFrame({
             {children}
           </Dialog.Popup>
         </Dialog.Viewport>
-      </Dialog.Portal>
+      </WorkspaceDialogPortal>
     </Dialog.Root>
   );
 }
@@ -357,7 +358,7 @@ function DeleteDialog({
 
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
-      <AlertDialog.Portal>
+      <WorkspaceAlertDialogPortal>
         <AlertDialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" />
         <AlertDialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
           <AlertDialog.Popup className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl outline-none">
@@ -380,7 +381,7 @@ function DeleteDialog({
             </form>
           </AlertDialog.Popup>
         </AlertDialog.Viewport>
-      </AlertDialog.Portal>
+      </WorkspaceAlertDialogPortal>
     </AlertDialog.Root>
   );
 }

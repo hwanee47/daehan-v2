@@ -15,6 +15,7 @@ import { FormEvent, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import {
   appGridSingleRowSelection,
   appGridTheme,
@@ -235,7 +236,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
       </section>
 
       <Dialog.Root open={viewingRun !== null} onOpenChange={(open) => { if (!open) setViewingRun(null); }}>
-        <Dialog.Portal>
+        <WorkspaceDialogPortal>
           <Dialog.Backdrop className="fixed inset-0 z-[70] bg-foreground/40 backdrop-blur-[2px]" />
           <Dialog.Viewport className="fixed inset-0 z-[70] p-2 sm:p-5">
             <Dialog.Popup className="@container/workspace relative mx-auto h-full w-full max-w-[1360px] overflow-hidden rounded-3xl border border-border bg-background p-3 shadow-xl outline-none sm:p-5">
@@ -259,7 +260,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
               ) : null}
             </Dialog.Popup>
           </Dialog.Viewport>
-        </Dialog.Portal>
+        </WorkspaceDialogPortal>
       </Dialog.Root>
     </div>
   );

@@ -2,21 +2,22 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
-import { Expand, FilePlus2, MapPin, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { ChevronLeft, ChevronRight, Expand, FilePlus2, MapPin, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { cn } from "@/lib/utils";
 
-import { deleteInspectionReport, getInspectionToleranceRanges, saveInspectionReport } from "./actions";
+import { deleteInspectionReport, getInspectionToleranceRanges, saveInspectionReport, searchInspectionReports } from "./actions";
 import { InspectionMarkerImage, type InspectionMarker } from "./inspection-marker-image";
 import { InspectionMarkerPositionDialog } from "./inspection-marker-position-dialog";
 import { ItemDetailCombobox } from "./item-detail-combobox";
 import { PartyAutocomplete } from "./party-autocomplete";
 import { ToleranceAutocomplete } from "./tolerance-autocomplete";
-import type { InspectionReport, InspectionReportActionState, InspectionReportData, InspectionReportDraftItem, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
+import type { InspectionReport, InspectionReportActionState, InspectionReportData, InspectionReportDraftItem, InspectionReportPage, InspectionReportQuery, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
 
 const initialActionState: InspectionReportActionState = { status: "idle" };
 const inputClass = "h-11 w-full rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20";
@@ -48,7 +49,7 @@ function Field({ children, className, label }: { children: React.ReactNode; clas
 function FullscreenImage({ label, markers, onClose, url }: { label: string; markers: InspectionMarker[]; onClose: () => void; url: string }) {
   return (
     <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <Dialog.Portal>
+      <WorkspaceDialogPortal>
         <Dialog.Backdrop className="fixed inset-0 z-[70] bg-foreground/90 backdrop-blur-sm" />
         <Dialog.Viewport className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6">
           <Dialog.Popup className="relative size-full outline-none">
@@ -58,12 +59,12 @@ function FullscreenImage({ label, markers, onClose, url }: { label: string; mark
             <Dialog.Close aria-label="전체 화면 닫기" className="absolute right-1 top-1 inline-flex size-11 items-center justify-center rounded-full bg-background text-foreground shadow-lg sm:right-3 sm:top-3"><X aria-hidden="true" /></Dialog.Close>
           </Dialog.Popup>
         </Dialog.Viewport>
-      </Dialog.Portal>
+      </WorkspaceDialogPortal>
     </Dialog.Root>
   );
 }
 
-function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionReportData; onOpenChange: (open: boolean) => void; open: boolean; report: InspectionReport | null }) {
+function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: InspectionReportData; onOpenChange: (open: boolean) => void; onSaved: (reportSeq?: number) => void; open: boolean; report: InspectionReport | null }) {
   const [state, formAction, pending] = useActionState(saveInspectionReport, initialActionState);
   const onSaveFormKeyDown = useSaveFormShortcut();
   const [itemDetailSeq, setItemDetailSeq] = useState(report ? String(report.item_detail_seq) : "");
@@ -100,7 +101,7 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
     .map((code) => code.code_name);
   const markers = rows.flatMap((row, index) => row.markerXRatio === null || row.markerYRatio === null ? [] : [{ x: row.markerXRatio, y: row.markerYRatio, label: index + 1 }]);
 
-  useEffect(() => { if (state.status === "success") onOpenChange(false); }, [onOpenChange, state.status]);
+  useEffect(() => { if (state.status === "success") { onOpenChange(false); onSaved(state.reportSeq); } }, [onOpenChange, onSaved, state.reportSeq, state.status]);
 
   useEffect(() => {
     const seq = Number(itemDetailSeq);
@@ -156,7 +157,7 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
+      <WorkspaceDialogPortal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" />
         <Dialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5">
           <Dialog.Popup className="flex h-[calc(100svh-1rem)] w-full max-w-[1500px] flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-xl outline-none sm:h-[calc(100svh-2.5rem)]">
@@ -218,61 +219,98 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
             </form>
           </Dialog.Popup>
         </Dialog.Viewport>
-      </Dialog.Portal>
+      </WorkspaceDialogPortal>
       {fullscreen && selectedItem?.image_url ? <FullscreenImage label={selectedItem.item_detail_name} markers={markers} onClose={() => setFullscreen(false)} url={selectedItem.image_url} /> : null}
       {markerDialogOpen && selectedItem?.image_url ? <InspectionMarkerPositionDialog imageLabel={selectedItem.item_detail_name} imageUrl={selectedItem.image_url} onApply={(positions) => setRows((current) => current.map((row, index) => ({ ...row, ...positions[index] })))} onOpenChange={setMarkerDialogOpen} open={markerDialogOpen} rows={rows} /> : null}
     </Dialog.Root>
   );
 }
 
-function DeleteReportDialog({ onOpenChange, open, report }: { onOpenChange: (open: boolean) => void; open: boolean; report: InspectionReport }) {
+function DeleteReportDialog({ onDeleted, onOpenChange, open, report }: { onDeleted: () => void; onOpenChange: (open: boolean) => void; open: boolean; report: InspectionReport }) {
   const [state, action, pending] = useActionState(deleteInspectionReport, initialActionState);
-  useEffect(() => { if (state.status === "success") onOpenChange(false); }, [onOpenChange, state.status]);
-  return <AlertDialog.Root open={open} onOpenChange={onOpenChange}><AlertDialog.Portal><AlertDialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" /><AlertDialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center p-4"><AlertDialog.Popup className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl outline-none"><AlertDialog.Title className="text-xl font-semibold">검사성적서를 삭제할까요?</AlertDialog.Title><AlertDialog.Description className="mt-3 text-muted-foreground">#{report.seq} 검사성적서와 모든 측정결과가 삭제되며 되돌릴 수 없어요.</AlertDialog.Description><form action={action} className="mt-6"><input name="seq" type="hidden" value={report.seq} />{state.message ? <p className="mb-4 text-sm text-destructive" role="alert">{state.message}</p> : null}<div className="flex justify-end gap-3"><AlertDialog.Close className="inline-flex h-11 items-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>취소</AlertDialog.Close><Button disabled={pending} variant="destructive">{pending ? "삭제 중..." : "삭제"}</Button></div></form></AlertDialog.Popup></AlertDialog.Viewport></AlertDialog.Portal></AlertDialog.Root>;
+  useEffect(() => { if (state.status === "success") { onOpenChange(false); onDeleted(); } }, [onDeleted, onOpenChange, state.status]);
+  return <AlertDialog.Root open={open} onOpenChange={onOpenChange}><WorkspaceAlertDialogPortal><AlertDialog.Backdrop className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-[2px]" /><AlertDialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center p-4"><AlertDialog.Popup className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl outline-none"><AlertDialog.Title className="text-xl font-semibold">검사성적서를 삭제할까요?</AlertDialog.Title><AlertDialog.Description className="mt-3 text-muted-foreground">#{report.seq} 검사성적서와 모든 측정결과가 삭제되며 되돌릴 수 없어요.</AlertDialog.Description><form action={action} className="mt-6"><input name="seq" type="hidden" value={report.seq} />{state.message ? <p className="mb-4 text-sm text-destructive" role="alert">{state.message}</p> : null}<div className="flex justify-end gap-3"><AlertDialog.Close className="inline-flex h-11 items-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>취소</AlertDialog.Close><Button disabled={pending} variant="destructive">{pending ? "삭제 중..." : "삭제"}</Button></div></form></AlertDialog.Popup></AlertDialog.Viewport></WorkspaceAlertDialogPortal></AlertDialog.Root>;
 }
 
-export function InspectionReportManagement({ data }: { data: InspectionReportData }) {
-  const [selectedSeq, setSelectedSeq] = useState<number | null>(data.reports[0]?.seq ?? null);
+export function InspectionReportManagement({ data, initialPage }: { data: InspectionReportData; initialPage: InspectionReportPage }) {
+  const [pageResult, setPageResult] = useState(initialPage);
+  const [selectedSeq, setSelectedSeq] = useState<number | null>(initialPage.rows[0]?.seq ?? null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingReport, setEditingReport] = useState<InspectionReport | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [detailFullscreen, setDetailFullscreen] = useState(false);
+  const [searchField, setSearchField] = useState("all");
+  const [keyword, setKeyword] = useState("");
+  const [sortOrder, setSortOrder] = useState("newest");
+  const [appliedQuery, setAppliedQuery] = useState<InspectionReportQuery>({ searchField: "all", keyword: "", sortOrder: "newest", page: 1 });
+  const [isSearching, startSearchTransition] = useTransition();
+  const [detailTab, setDetailTab] = useState<"basic" | "inspection">("basic");
   const codeMap = useMemo(() => new Map(data.codes.map((code) => [code.seq, code.code_name])), [data.codes]);
-  const selected = data.reports.find((report) => report.seq === selectedSeq) ?? null;
-  const selectedItem = selected ? data.itemOptions.find((item) => item.seq === selected.item_detail_seq) ?? null : null;
+  const itemBySeq = useMemo(() => new Map(data.itemOptions.map((item) => [item.seq, item])), [data.itemOptions]);
+  const itemCountByReport = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const item of data.items) counts.set(item.inspection_report_seq, (counts.get(item.inspection_report_seq) ?? 0) + 1);
+    return counts;
+  }, [data.items]);
+  const totalPages = Math.max(1, Math.ceil(pageResult.total / pageResult.pageSize));
+  const currentPage = Math.min(pageResult.page, totalPages);
+  const visibleReports = pageResult.rows;
+  const selected = visibleReports.find((report) => report.seq === selectedSeq) ?? visibleReports[0] ?? null;
+  const selectedItem = selected ? itemBySeq.get(selected.item_detail_seq) ?? null : null;
   const selectedItems = selected ? data.items.filter((item) => item.inspection_report_seq === selected.seq) : [];
   const selectedMarkers = selectedItems.flatMap((item) => item.marker_x_ratio === null || item.marker_y_ratio === null ? [] : [{ x: item.marker_x_ratio, y: item.marker_y_ratio, label: item.sort_order }]);
 
   function openNew() { setEditingReport(null); setEditorOpen(true); }
   function openEdit(report = selected) { if (!report) return; setEditingReport(report); setEditorOpen(true); }
+  function selectReport(report: InspectionReport) { setSelectedSeq(report.seq); setDetailTab("basic"); }
+
+  const loadReports = useCallback((query: InspectionReportQuery, preferredSeq?: number) => {
+    startSearchTransition(async () => {
+      const result = await searchInspectionReports(query);
+      setPageResult(result);
+      if (!result.error) {
+        setAppliedQuery(query);
+        setSelectedSeq(result.rows.some((report) => report.seq === preferredSeq) ? preferredSeq ?? null : result.rows[0]?.seq ?? null);
+      }
+    });
+  }, []);
+
+  const refreshReports = useCallback((preferredSeq?: number) => {
+    loadReports({ ...appliedQuery, page: 1 }, preferredSeq);
+  }, [appliedQuery, loadReports]);
 
   if (data.hasError) return <div className="rounded-3xl border border-border bg-card p-6" role="alert"><h2 className="text-lg font-semibold">검사성적서를 불러오지 못했어요</h2><p className="mt-2 text-muted-foreground">잠시 후 다시 시도해 주세요.</p></div>;
 
   return <div className="flex min-h-0 flex-col gap-4">
-    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">총 <strong className="text-foreground">{data.reports.length}</strong>건이에요.</p><Button onClick={openNew}><FilePlus2 aria-hidden="true" />성적서 등록</Button></div>
-    <div className="grid min-h-[620px] gap-4 @min-[1024px]/workspace:h-[calc(100svh-190px)] @min-[1024px]/workspace:min-h-0 @min-[1024px]/workspace:grid-cols-[280px_minmax(0,1fr)] @min-[1280px]/workspace:grid-cols-[310px_minmax(0,1fr)]">
+    <form className="flex flex-col gap-3 border-y border-border bg-background p-3 @min-[768px]/workspace:flex-row @min-[768px]/workspace:items-end" onSubmit={(event) => { event.preventDefault(); loadReports({ searchField: searchField as InspectionReportQuery["searchField"], keyword: keyword.trim(), sortOrder: sortOrder as InspectionReportQuery["sortOrder"], page: 1 }); }}>
+      <label className="grid w-full gap-1.5 text-sm font-medium @min-[768px]/workspace:w-44"><span>검색 유형</span><Select aria-label="검색 유형" className="h-10" onValueChange={setSearchField} options={[{ label: "통합검색", value: "all" }, { label: "기종", value: "model" }, { label: "품번/도번", value: "drawing" }, { label: "품명", value: "itemName" }, { label: "고객명", value: "customer" }, { label: "업체명", value: "supplier" }]} value={searchField} /></label>
+      <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium"><span>검색어</span><span className="relative"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input className="h-10 w-full rounded-sm border border-input bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" maxLength={100} onChange={(event) => setKeyword(event.target.value)} placeholder="검색어를 입력해 주세요" type="search" value={keyword} /></span></label>
+      <label className="grid w-full gap-1.5 text-sm font-medium @min-[768px]/workspace:w-36"><span>정렬</span><Select aria-label="정렬" className="h-10" onValueChange={setSortOrder} options={[{ label: "최신순", value: "newest" }, { label: "오래된순", value: "oldest" }]} value={sortOrder} /></label>
+      <div className="flex items-center justify-between gap-2 @min-[768px]/workspace:ml-auto"><p className="whitespace-nowrap text-sm text-muted-foreground">검색 <strong className="text-foreground">{pageResult.total}</strong>건</p><Button disabled={isSearching} type="submit"><Search aria-hidden="true" />{isSearching ? "조회 중" : "조회"}</Button><Button onClick={openNew} type="button"><FilePlus2 aria-hidden="true" />성적서 등록</Button></div>
+    </form>
+    {pageResult.error ? <p className="text-sm text-destructive" role="alert">{pageResult.error}</p> : null}
+    <div className="grid min-h-[680px] gap-4 @min-[1024px]/workspace:h-[calc(100svh-250px)] @min-[1024px]/workspace:min-h-0 @min-[1024px]/workspace:grid-cols-[340px_minmax(0,1fr)] @min-[1280px]/workspace:grid-cols-[380px_minmax(0,1fr)]">
       <section aria-labelledby="report-list-title" className="flex min-h-0 min-w-0 flex-col overflow-hidden border-y border-border">
-        <div className="flex items-center justify-between bg-muted/70 px-4 py-3"><h2 className="font-semibold" id="report-list-title">성적서 마스터</h2><span className="text-xs text-muted-foreground">행을 선택해 주세요</span></div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{data.reports.length ? <div className="divide-y divide-border">{data.reports.map((report) => { const itemOption = data.itemOptions.find((item) => item.seq === report.item_detail_seq); const selectedRow = selectedSeq === report.seq; return <button aria-pressed={selectedRow} className={cn("block min-h-24 w-full px-4 py-3 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", selectedRow && "bg-primary/10 hover:bg-primary/10")} key={report.seq} onClick={() => setSelectedSeq(report.seq)} onDoubleClick={() => openEdit(report)} type="button"><span className="flex items-center justify-between gap-3"><strong className="truncate text-sm">#{report.seq} · {report.item_detail_code}</strong><span className={cn("shrink-0 text-xs font-semibold", selectedRow ? "text-primary" : "text-muted-foreground")}>{report.final_judgment_code_seq ? codeMap.get(report.final_judgment_code_seq) ?? "판정" : "미판정"}</span></span><span className="mt-2 block truncate text-sm text-foreground">{itemOption?.item_name || report.model_name}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{report.model_name}{report.customer_name ? ` · ${report.customer_name}` : ""}</span></button>; })}</div> : <p className="px-4 py-16 text-center text-sm text-muted-foreground">등록된 검사성적서가 없어요.</p>}</div>
+        <div className="flex items-center justify-between bg-muted/70 px-4 py-3"><h2 className="font-semibold" id="report-list-title">성적서 목록</h2><span className="text-xs text-muted-foreground">{currentPage} / {totalPages} 페이지</span></div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{visibleReports.length ? <div className="divide-y divide-border">{visibleReports.map((report) => { const itemOption = itemBySeq.get(report.item_detail_seq); const selectedRow = selected?.seq === report.seq; return <button aria-pressed={selectedRow} className={cn("block min-h-[68px] w-full px-4 py-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", selectedRow && "bg-primary/10 hover:bg-primary/10")} key={report.seq} onClick={() => selectReport(report)} onDoubleClick={() => openEdit(report)} type="button"><span className="flex items-center justify-between gap-3"><strong className="truncate text-sm">{report.item_detail_code}</strong><span className={cn("shrink-0 text-xs tabular-nums", selectedRow ? "font-semibold text-primary" : "text-muted-foreground")}>#{report.seq}</span></span><span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"><span className="truncate">{report.model_name} · {itemOption?.item_name || "품명 미입력"}</span><span aria-hidden="true">·</span><span className="shrink-0">{itemCountByReport.get(report.seq) ?? 0}항목</span></span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{report.customer_name || "고객명 미입력"}</span></button>; })}</div> : <p className="px-4 py-16 text-center text-sm text-muted-foreground">{data.reports.length ? "검색 결과가 없어요." : "등록된 검사성적서가 없어요."}</p>}</div>
+        <div className="flex min-h-14 items-center justify-between gap-2 border-t border-border px-3"><span className="text-xs text-muted-foreground">페이지당 최대 {pageResult.pageSize}건</span><div className="flex gap-2"><Button aria-label="이전 페이지" disabled={isSearching || currentPage <= 1} onClick={() => loadReports({ ...appliedQuery, page: currentPage - 1 })} size="sm" variant="secondary"><ChevronLeft aria-hidden="true" />이전</Button><Button aria-label="다음 페이지" disabled={isSearching || currentPage >= totalPages} onClick={() => loadReports({ ...appliedQuery, page: currentPage + 1 })} size="sm" variant="secondary">다음<ChevronRight aria-hidden="true" /></Button></div></div>
       </section>
       <section aria-labelledby="report-detail-title" className="flex min-h-0 min-w-0 flex-col overflow-hidden border-y border-border">
-        <div className="flex min-h-14 items-center justify-between gap-3 bg-muted/70 px-4 py-2"><div className="min-w-0"><h2 className="font-semibold" id="report-detail-title">성적서 정보</h2>{selected ? <p className="mt-0.5 truncate text-xs text-muted-foreground">#{selected.seq} · {selected.item_detail_code}</p> : null}</div>{selected ? <div className="flex shrink-0 gap-2"><Button onClick={() => openEdit()} size="sm" variant="secondary"><Pencil aria-hidden="true" />수정</Button><Button onClick={() => setDeleteOpen(true)} size="sm" variant="secondary"><Trash2 aria-hidden="true" />삭제</Button></div> : null}</div>
-        {selected ? <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 @min-[640px]/workspace:p-5">
-          <dl className="grid gap-x-5 gap-y-3 rounded-2xl bg-muted/35 p-4 @min-[640px]/workspace:grid-cols-2 @min-[1280px]/workspace:grid-cols-3">{[
-            ["기종", selected.model_name], ["품목상세코드", selected.item_detail_code], ["품명", selectedItem?.item_name ?? "-"],
-            ["고객명", selected.customer_name || "-"], ["업체명", selected.supplier_name || "-"], ["납품수량", selected.delivery_quantity?.toLocaleString() ?? "-"],
-            ["시료수", selected.sample_count ?? "-"], ["제품구분", selected.product_type_code_seq ? codeMap.get(selected.product_type_code_seq) ?? "-" : "-"],
-            ["경도", selected.hardness || "-"], ["열처리", selected.heat_treatment || "-"], ["최종판정", selected.final_judgment_code_seq ? codeMap.get(selected.final_judgment_code_seq) ?? "-" : "미판정"],
-          ].map(([label, value]) => <div className="min-w-0" key={label}><dt className="text-xs font-medium text-muted-foreground">{label}</dt><dd className="mt-1 break-words text-sm font-semibold">{value}</dd></div>)}</dl>
-          <div className="grid gap-5 @min-[768px]/workspace:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.25fr)]">
+        <div className="flex min-h-16 items-center justify-between gap-3 bg-muted/70 px-4 py-2"><div className="min-w-0"><h2 className="truncate font-semibold" id="report-detail-title">{selected ? `${selected.item_detail_code} · ${selectedItem?.item_name || selected.model_name}` : "성적서 정보"}</h2>{selected ? <p className="mt-0.5 truncate text-xs text-muted-foreground">#{selected.seq} · {selected.model_name}{selected.customer_name ? ` · ${selected.customer_name}` : ""}</p> : null}</div>{selected ? <div className="flex shrink-0 gap-2"><Button onClick={() => openEdit()} size="sm" variant="secondary"><Pencil aria-hidden="true" />수정</Button><Button onClick={() => setDeleteOpen(true)} size="sm" variant="secondary"><Trash2 aria-hidden="true" />삭제</Button></div> : null}</div>
+        {selected ? <><div aria-label="성적서 상세 구분" className="flex shrink-0 border-b border-border px-4" role="tablist"><button aria-selected={detailTab === "basic"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", detailTab === "basic" ? "border-primary text-primary" : "border-transparent text-muted-foreground")} onClick={() => setDetailTab("basic")} role="tab" type="button">기본정보</button><button aria-selected={detailTab === "inspection"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", detailTab === "inspection" ? "border-primary text-primary" : "border-transparent text-muted-foreground")} onClick={() => setDetailTab("inspection")} role="tab" type="button">도면·검사항목 <span className="ml-1 text-xs">{selectedItems.length}</span></button></div><div className="min-h-0 flex-1 overflow-y-auto p-4 @min-[640px]/workspace:p-5">
+          {detailTab === "basic" ? <dl className="grid gap-x-6 gap-y-5 @min-[640px]/workspace:grid-cols-2 @min-[1280px]/workspace:grid-cols-3">{[
+            ["기종", selected.model_name], ["품목상세코드", selected.item_detail_code], ["품명", selectedItem?.item_name ?? ""],
+            ["고객명", selected.customer_name ?? ""], ["업체명", selected.supplier_name ?? ""], ["납품수량", selected.delivery_quantity?.toLocaleString() ?? ""],
+            ["시료수", selected.sample_count ?? ""], ["제품구분", selected.product_type_code_seq ? codeMap.get(selected.product_type_code_seq) ?? "" : ""],
+            ["경도", selected.hardness ?? ""], ["열처리", selected.heat_treatment ?? ""],
+          ].map(([label, value]) => <div className="min-w-0 border-b border-border pb-3" key={label}><dt className="text-xs font-medium text-muted-foreground">{label}</dt><dd className={cn("mt-1.5 min-h-5 break-words text-sm", value ? "font-medium text-foreground" : "text-muted-foreground")}>{value || "미입력"}</dd></div>)}</dl> : <div className="grid gap-5 @min-[768px]/workspace:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.25fr)]">
             <div><h3 className="text-sm font-semibold">도면 / 제품 이미지</h3><div className="relative mt-3 flex h-64 items-center justify-center overflow-hidden bg-muted/30">{selectedItem?.image_url ? <><InspectionMarkerImage alt={`${selectedItem.item_detail_name} 이미지`} markers={selectedMarkers} url={selectedItem.image_url} /><button aria-label="이미지 전체 화면 보기" className="absolute right-3 top-3 z-20 inline-flex size-11 items-center justify-center rounded-full bg-background shadow" onClick={() => setDetailFullscreen(true)} type="button"><Expand aria-hidden="true" /></button></> : <p className="px-5 text-center text-sm text-muted-foreground">품목상세에 등록된 이미지가 없어요.</p>}</div></div>
             <div className="min-w-0"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">검사항목</h3><span className="text-xs text-muted-foreground">{selectedItems.length}개</span></div><div className="mt-3 max-h-64 overflow-auto border-y border-border"><table className="w-full min-w-[430px] border-collapse text-sm"><thead className="sticky top-0 z-10 bg-muted"><tr><th className="w-16 px-3 py-3 text-center">순번</th><th className="px-3 py-3 text-right">기준치수</th><th className="px-3 py-3 text-right">공차 min</th><th className="px-3 py-3 text-right">공차 max</th></tr></thead><tbody>{selectedItems.length ? selectedItems.map((item) => <tr className="border-t border-border bg-background" key={item.seq}><td className="px-3 py-2.5 text-center tabular-nums">{item.sort_order}</td><td className="px-3 py-2.5 text-right tabular-nums">{numberText(item.nominal_dimension)}</td><td className="px-3 py-2.5 text-right tabular-nums">{numberText(item.tolerance_min)}</td><td className="px-3 py-2.5 text-right tabular-nums">{numberText(item.tolerance_max)}</td></tr>) : <tr><td className="px-4 py-12 text-center text-muted-foreground" colSpan={4}>등록된 검사항목이 없어요.</td></tr>}</tbody></table></div></div>
-          </div>
-        </div> : <div className="flex min-h-72 items-center justify-center p-6 text-center text-sm text-muted-foreground">왼쪽 목록에서 성적서를 선택해 주세요.</div>}
+          </div>}</div></> : <div className="flex min-h-72 items-center justify-center p-6 text-center text-sm text-muted-foreground">왼쪽 목록에서 성적서를 선택해 주세요.</div>}
       </section>
     </div>
-    {editorOpen ? <ReportEditor data={data} key={`${editingReport?.seq ?? "new"}-${editorOpen}`} onOpenChange={setEditorOpen} open={editorOpen} report={editingReport} /> : null}
-    {selected ? <DeleteReportDialog key={`${selected.seq}-${deleteOpen}`} onOpenChange={setDeleteOpen} open={deleteOpen} report={selected} /> : null}
+    {editorOpen ? <ReportEditor data={data} key={`${editingReport?.seq ?? "new"}-${editorOpen}`} onOpenChange={setEditorOpen} onSaved={refreshReports} open={editorOpen} report={editingReport} /> : null}
+    {selected ? <DeleteReportDialog key={`${selected.seq}-${deleteOpen}`} onDeleted={refreshReports} onOpenChange={setDeleteOpen} open={deleteOpen} report={selected} /> : null}
     {detailFullscreen && selectedItem?.image_url ? <FullscreenImage label={selectedItem.item_detail_name} markers={selectedMarkers} onClose={() => setDetailFullscreen(false)} url={selectedItem.image_url} /> : null}
   </div>;
 }
