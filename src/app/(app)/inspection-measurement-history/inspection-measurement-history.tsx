@@ -90,8 +90,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
                 className="h-8"
                 onClick={(event) => {
                   event.stopPropagation();
-                  setSelectedRunSeq(run.seq);
-                  setViewingRun(run);
+                  openRun(run);
                 }}
                 size="sm"
                 variant="secondary"
