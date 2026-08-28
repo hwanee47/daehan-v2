@@ -9,6 +9,7 @@ import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 
 import {
@@ -135,6 +136,7 @@ function GroupEditor({
   open: boolean;
 }) {
   const [state, formAction, pending] = useActionState(saveCodeGroup, initialActionState);
+  const onSaveFormKeyDown = useSaveFormShortcut();
 
   useEffect(() => {
     if (state.status === "success") onOpenChange(false);
@@ -147,7 +149,7 @@ function GroupEditor({
       open={open}
       title={group ? "코드그룹 수정" : "코드그룹 추가"}
     >
-      <form action={formAction} className="mt-6 space-y-4">
+      <form action={formAction} className="mt-6 space-y-4" onKeyDown={onSaveFormKeyDown}>
         {group ? <input name="seq" type="hidden" value={group.seq} /> : null}
         <div className="space-y-2">
           <label className="font-semibold" htmlFor="group-code">그룹 코드</label>
@@ -217,7 +219,7 @@ function GroupEditor({
           <Dialog.Close className="inline-flex h-12 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>
             취소
           </Dialog.Close>
-          <Button disabled={pending} type="submit">
+          <Button data-save-submit="true" disabled={pending} type="submit">
             {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
             저장하기
           </Button>
@@ -241,6 +243,7 @@ function DetailEditor({
   open: boolean;
 }) {
   const [state, formAction, pending] = useActionState(saveCodeDetail, initialActionState);
+  const onSaveFormKeyDown = useSaveFormShortcut();
 
   useEffect(() => {
     if (state.status === "success") onOpenChange(false);
@@ -253,7 +256,7 @@ function DetailEditor({
       open={open}
       title={detail ? "상세 코드 수정" : "상세 코드 추가"}
     >
-      <form action={formAction} className="mt-6 space-y-4">
+      <form action={formAction} className="mt-6 space-y-4" onKeyDown={onSaveFormKeyDown}>
         {detail ? <input name="seq" type="hidden" value={detail.seq} /> : null}
         <input name="codeGroupSeq" type="hidden" value={group.seq} />
         <div className="space-y-2">
@@ -323,7 +326,7 @@ function DetailEditor({
           <Dialog.Close className="inline-flex h-12 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>
             취소
           </Dialog.Close>
-          <Button disabled={pending} type="submit">
+          <Button data-save-submit="true" disabled={pending} type="submit">
             {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : null}
             저장하기
           </Button>

@@ -7,6 +7,7 @@ import { useActionState, useEffect, useMemo, useState, useTransition } from "rea
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { cn } from "@/lib/utils";
 
 import { deleteInspectionReport, getInspectionToleranceRanges, saveInspectionReport } from "./actions";
@@ -21,10 +22,10 @@ const initialActionState: InspectionReportActionState = { status: "idle" };
 const inputClass = "h-11 w-full rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20";
 
 function blankItem(): InspectionReportDraftItem {
-  return { nominalDimension: "", toleranceMin: "", toleranceMax: "", results: Array(10).fill(""), note: "", markerXRatio: null, markerYRatio: null };
+  return { nominalDimension: "", toleranceMin: "", toleranceMax: "", results: Array(10).fill(""), note: "", markerXRatio: null, markerYRatio: null, isDirectCode: false };
 }
 
-function numberText(value: number | null | undefined) {
+function numberText(value: number | string | null | undefined) {
   return value === null || value === undefined ? "" : String(value);
 }
 
@@ -64,6 +65,7 @@ function FullscreenImage({ label, markers, onClose, url }: { label: string; mark
 
 function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionReportData; onOpenChange: (open: boolean) => void; open: boolean; report: InspectionReport | null }) {
   const [state, formAction, pending] = useActionState(saveInspectionReport, initialActionState);
+  const onSaveFormKeyDown = useSaveFormShortcut();
   const [itemDetailSeq, setItemDetailSeq] = useState(report ? String(report.item_detail_seq) : "");
   const [productTypeCodeSeq, setProductTypeCodeSeq] = useState(report?.product_type_code_seq ? String(report.product_type_code_seq) : "");
   const [sampleCount, setSampleCount] = useState(report?.sample_count ? String(report.sample_count) : "");
@@ -81,6 +83,7 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
         note: measurement?.note ?? "",
         markerXRatio: item.marker_x_ratio,
         markerYRatio: item.marker_y_ratio,
+        isDirectCode: false,
       };
     });
   }, [data.items, data.measurements, report]);
@@ -127,9 +130,20 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
     const range = auto ? matchingTolerance(toleranceResult.ranges, value) : null;
     updateRow(index, {
       nominalDimension: value,
+      isDirectCode: true,
       ...(auto ? { toleranceMin: range ? String(range.lower_deviation) : "", toleranceMax: range ? String(range.upper_deviation) : "" } : {}),
     });
     if (auto) setToleranceModes((current) => current.map((mode, rowIndex) => rowIndex === index ? "auto" : mode));
+  }
+
+  function selectNominalCode(index: number, codeName: string, range: InspectionToleranceRange) {
+    updateRow(index, {
+      nominalDimension: codeName,
+      toleranceMin: String(range.lower_deviation),
+      toleranceMax: String(range.upper_deviation),
+      isDirectCode: false,
+    });
+    setToleranceModes((current) => current.map((mode, rowIndex) => rowIndex === index ? "auto" : mode));
   }
 
   function updateTolerance(index: number, key: "toleranceMin" | "toleranceMax", value: string) {
@@ -138,14 +152,6 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
     const nextMax = key === "toleranceMax" ? value : row.toleranceMax;
     updateRow(index, { [key]: value });
     setToleranceModes((current) => current.map((mode, rowIndex) => rowIndex === index ? !nextMin.trim() && !nextMax.trim() ? "auto" : "manual" : mode));
-  }
-
-  function applyTolerance(index: number, range: InspectionToleranceRange) {
-    updateRow(index, {
-      toleranceMin: String(range.lower_deviation),
-      toleranceMax: String(range.upper_deviation),
-    });
-    setToleranceModes((current) => current.map((mode, rowIndex) => rowIndex === index ? "auto" : mode));
   }
 
   return (
@@ -164,7 +170,7 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
               <button aria-controls="report-editor-items" aria-selected={editorStep === "items"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", editorStep === "items" ? "border-primary text-primary" : "border-transparent text-muted-foreground")} id="report-editor-tab-items" onClick={() => setEditorStep("items")} onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); setEditorStep("basic"); } }} role="tab" type="button">2. 검사항목 · 순번 ({rows.length})</button>
             </div>
 
-            <form action={formAction} className="flex min-h-0 flex-1 flex-col">
+            <form action={formAction} className="flex min-h-0 flex-1 flex-col" onKeyDown={onSaveFormKeyDown}>
               <input name="seq" type="hidden" value={report?.seq ?? ""} />
               <input name="items" type="hidden" value={JSON.stringify(rows)} />
               <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
@@ -204,11 +210,11 @@ function ReportEditor({ data, onOpenChange, open, report }: { data: InspectionRe
                 <input name="finalJudgmentCodeSeq" type="hidden" value={report?.final_judgment_code_seq ?? ""} />
 
                 <div className="flex min-h-0 min-w-0 flex-col"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold" id="measurements-title">검사항목</h3><p className="mt-1 text-sm text-muted-foreground">기준치수의 숫자에 맞는 공차를 자동으로 입력해요.</p><p aria-live="polite" className={cn("mt-1 text-xs", toleranceResult.error ? "text-destructive" : "text-muted-foreground")}>{isTolerancePending ? "오차범위를 불러오는 중이에요." : toleranceResult.error ?? (itemDetailSeq && toleranceResult.ranges.length === 0 ? "등록된 오차범위가 없어 수동으로 입력해 주세요." : "")}</p></div><div className="flex flex-wrap gap-2"><Button disabled={!selectedItem?.image_url || rows.length === 0} onClick={() => setMarkerDialogOpen(true)} type="button" variant="secondary"><MapPin aria-hidden="true" />순번 위치 설정</Button><Button onClick={() => { setRows((current) => [...current, blankItem()]); setToleranceModes((current) => [...current, "auto"]); }} type="button" variant="secondary"><Plus aria-hidden="true" />항목 추가</Button></div></div>
-                <div className="mt-3 max-h-[420px] overflow-auto border-y border-border xl:max-h-[calc(100svh-19rem)]"><table className="w-full min-w-[560px] border-collapse text-sm"><thead className="sticky top-0 z-10 bg-muted"><tr><th className="w-14 p-3">순번</th><th className="p-3">기준치수</th><th className="p-3">공차 min</th><th className="p-3">공차 max</th><th className="w-14 p-3"><span className="sr-only">삭제</span></th></tr></thead><tbody>{rows.length ? rows.map((row, rowIndex) => <tr className="border-t border-border bg-background" key={row.seq ?? `new-${rowIndex}`}><td className="p-2 text-center font-medium">{rowIndex + 1}</td><td className="p-1"><ToleranceAutocomplete codeNames={toleranceCodeNames} onRangeSelect={(range) => applyTolerance(rowIndex, range)} onValueChange={(value) => updateNominalDimension(rowIndex, value)} ranges={toleranceResult.ranges} rowNumber={rowIndex + 1} value={row.nominalDimension} /></td>{(["toleranceMin", "toleranceMax"] as const).map((key) => <td className="p-1" key={key}><input aria-label={`${rowIndex + 1}번 ${key}`} className={cn(inputClass, "h-10 px-2 text-right tabular-nums")} inputMode="decimal" value={row[key]} onChange={(event) => updateTolerance(rowIndex, key, event.target.value)} /></td>)}<td className="p-1"><button aria-label={`${rowIndex + 1}번 항목 삭제`} className="inline-flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={() => { setRows((current) => current.filter((_, index) => index !== rowIndex)); setToleranceModes((current) => current.filter((_, index) => index !== rowIndex)); }} type="button"><Trash2 aria-hidden="true" size={18} /></button></td></tr>) : <tr><td className="p-8 text-center text-muted-foreground" colSpan={5}>등록된 검사항목이 없어요. 항목 추가를 눌러 시작해 주세요.</td></tr>}</tbody></table></div></div>
+                <div className="mt-3 max-h-[420px] overflow-auto border-y border-border xl:max-h-[calc(100svh-19rem)]"><table className="w-full min-w-[560px] border-collapse text-sm"><thead className="sticky top-0 z-10 bg-muted"><tr><th className="w-14 p-3">순번</th><th className="p-3">기준치수</th><th className="p-3">공차 min</th><th className="p-3">공차 max</th><th className="w-14 p-3"><span className="sr-only">삭제</span></th></tr></thead><tbody>{rows.length ? rows.map((row, rowIndex) => <tr className="border-t border-border bg-background" key={row.seq ?? `new-${rowIndex}`}><td className="p-2 text-center font-medium">{rowIndex + 1}</td><td className="p-1"><ToleranceAutocomplete codeNames={toleranceCodeNames} onOptionSelect={(codeName, range) => selectNominalCode(rowIndex, codeName, range)} onValueChange={(value) => updateNominalDimension(rowIndex, value)} ranges={toleranceResult.ranges} rowNumber={rowIndex + 1} value={row.nominalDimension} /></td>{(["toleranceMin", "toleranceMax"] as const).map((key) => <td className="p-1" key={key}><input aria-label={`${rowIndex + 1}번 ${key}`} className={cn(inputClass, "h-10 px-2 text-right tabular-nums")} inputMode="decimal" value={row[key]} onChange={(event) => updateTolerance(rowIndex, key, event.target.value)} /></td>)}<td className="p-1"><button aria-label={`${rowIndex + 1}번 항목 삭제`} className="inline-flex size-10 items-center justify-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive" onClick={() => { setRows((current) => current.filter((_, index) => index !== rowIndex)); setToleranceModes((current) => current.filter((_, index) => index !== rowIndex)); }} type="button"><Trash2 aria-hidden="true" size={18} /></button></td></tr>) : <tr><td className="p-8 text-center text-muted-foreground" colSpan={5}>등록된 검사항목이 없어요. 항목 추가를 눌러 시작해 주세요.</td></tr>}</tbody></table></div></div>
               </section>
               </div>
 
-              <div className="flex min-h-16 shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-background px-4 py-2 sm:px-6">{state.message ? <p className={cn("mr-auto text-sm", state.status === "error" ? "text-destructive" : "text-primary")} role="status">{state.message}</p> : <span className="mr-auto text-sm text-muted-foreground">기본정보와 검사항목을 함께 저장해요.</span>}<Dialog.Close className="inline-flex h-11 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>취소</Dialog.Close><Button disabled={pending} type="submit">{pending ? "저장 중..." : report ? "수정 저장" : "등록"}</Button></div>
+              <div className="flex min-h-16 shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-background px-4 py-2 sm:px-6">{state.message ? <p className={cn("mr-auto text-sm", state.status === "error" ? "text-destructive" : "text-primary")} role="status">{state.message}</p> : <span className="mr-auto text-sm text-muted-foreground">기본정보와 검사항목을 함께 저장해요.</span>}<Dialog.Close className="inline-flex h-11 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>취소</Dialog.Close><Button data-save-submit="true" disabled={pending} type="submit">{pending ? "저장 중..." : report ? "수정 저장" : "등록"}</Button></div>
             </form>
           </Dialog.Popup>
         </Dialog.Viewport>

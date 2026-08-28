@@ -25,14 +25,14 @@ function matches(option: ToleranceOption, query: string) {
 
 export function ToleranceAutocomplete({
   codeNames,
-  onRangeSelect,
+  onOptionSelect,
   onValueChange,
   ranges,
   rowNumber,
   value,
 }: {
   codeNames: string[];
-  onRangeSelect: (range: InspectionToleranceRange) => void;
+  onOptionSelect: (codeName: string, range: InspectionToleranceRange) => void;
   onValueChange: (value: string) => void;
   ranges: InspectionToleranceRange[];
   rowNumber: number;
@@ -59,8 +59,7 @@ export function ToleranceAutocomplete({
       onOpenChange={setOpen}
       onValueChange={(nextValue, details) => {
         if (details.reason === "item-press" && highlightedOption?.range) {
-          onValueChange(highlightedOption.codeName);
-          onRangeSelect(highlightedOption.range);
+          onOptionSelect(highlightedOption.codeName, highlightedOption.range);
           setOpen(false);
           return;
         }

@@ -8,6 +8,7 @@ import type { InspectionReportActionState, InspectionReportDraftItem, Inspection
 
 const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
+const codeManagementPath = "/master/codes";
 
 function text(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -24,18 +25,14 @@ function optionalPositiveInteger(value: string) {
 }
 
 function numeric(value: string) {
-  if (!value || !/^-?\d+(?:\.\d{1,4})?$/.test(value)) return null;
-  const number = Number(value);
+  const normalized = value.trim().replaceAll(",", "").replace(/[−–—]/g, "-").replaceAll("＋", "+");
+  if (!normalized || !/^[+-]?\d+(?:\.\d{1,4})?$/.test(normalized)) return null;
+  const number = Number(normalized);
   return Number.isFinite(number) ? number : null;
 }
 
 function optionalNumeric(value: string) {
   return value.trim() ? numeric(value.trim()) : null;
-}
-
-function firstNumeric(value: string) {
-  const match = value.match(/[-+]?(?:\d+(?:\.\d*)?|\.\d+)/);
-  return match ? numeric(match[0]) : null;
 }
 
 function parseItems(value: string): InspectionReportDraftItem[] | null {
@@ -46,7 +43,7 @@ function parseItems(value: string): InspectionReportDraftItem[] | null {
       if (!item || typeof item !== "object") return false;
       const candidate = item as Partial<InspectionReportDraftItem>;
       const markerValid = candidate.markerXRatio === null && candidate.markerYRatio === null || typeof candidate.markerXRatio === "number" && candidate.markerXRatio >= 0 && candidate.markerXRatio <= 1 && typeof candidate.markerYRatio === "number" && candidate.markerYRatio >= 0 && candidate.markerYRatio <= 1;
-      return typeof candidate.nominalDimension === "string" && typeof candidate.toleranceMin === "string" && typeof candidate.toleranceMax === "string" && Array.isArray(candidate.results) && candidate.results.length === 10 && candidate.results.every((result) => typeof result === "string") && typeof candidate.note === "string" && markerValid;
+      return typeof candidate.nominalDimension === "string" && typeof candidate.toleranceMin === "string" && typeof candidate.toleranceMax === "string" && Array.isArray(candidate.results) && candidate.results.length === 10 && candidate.results.every((result) => typeof result === "string") && typeof candidate.note === "string" && (candidate.isDirectCode === undefined || typeof candidate.isDirectCode === "boolean") && markerValid;
     }) ? parsed as InspectionReportDraftItem[] : null;
   } catch {
     return null;
@@ -76,14 +73,19 @@ export async function saveInspectionReport(
   }
 
   const normalizedItems = items.map((item) => ({
-    nominal: firstNumeric(item.nominalDimension),
+    nominal: item.nominalDimension.trim(),
     min: numeric(item.toleranceMin),
     max: numeric(item.toleranceMax),
     markerXRatio: item.markerXRatio,
     markerYRatio: item.markerYRatio,
   }));
-  if (normalizedItems.some((item) => item.nominal === null || item.min === null || item.max === null || (item.min as number) > (item.max as number))) {
-    return mutationError("검사항목의 기준치수와 공차를 다시 확인해 주세요.");
+  for (let index = 0; index < normalizedItems.length; index += 1) {
+    const item = normalizedItems[index];
+    if (!item.nominal) return mutationError(`${index + 1}번 검사항목의 기준치수를 입력해 주세요.`);
+    if (item.nominal.length > 100) return mutationError(`${index + 1}번 검사항목의 기준치수는 100자 이하로 입력해 주세요.`);
+    if (item.min === null) return mutationError(`${index + 1}번 검사항목의 공차 min을 숫자로 입력해 주세요.`);
+    if (item.max === null) return mutationError(`${index + 1}번 검사항목의 공차 max를 숫자로 입력해 주세요.`);
+    if (item.min > item.max) return mutationError(`${index + 1}번 검사항목의 공차 min은 공차 max보다 작거나 같아야 해요.`);
   }
 
   const supabase = await createClient();
@@ -93,6 +95,15 @@ export async function saveInspectionReport(
   const { data: selectedDetail, error: detailError } = await supabase.from("item_details").select("seq, items!inner(model_name)").eq("seq", itemDetailSeq).maybeSingle();
   const detail = selectedDetail as unknown as { seq: number; items: { model_name: string | null } } | null;
   if (detailError || !detail?.items.model_name) return mutationError("기종이 등록된 품목상세를 선택해 주세요.");
+
+  const directCodeNames = [...new Set(items.filter((item) => item.isDirectCode).map((item) => item.nominalDimension.trim()))];
+  if (directCodeNames.length > 0) {
+    const { error: codeError } = await supabase.rpc("ensure_u0003_codes", { p_code_names: directCodeNames });
+    if (codeError) {
+      console.error("Failed to ensure U0003 codes", { code: codeError.code });
+      return mutationError("직접 입력한 기준치수를 코드에 추가하지 못했어요. 다시 시도해 주세요.");
+    }
+  }
 
   const masterValues = {
     item_detail_seq: itemDetailSeq,
@@ -115,7 +126,7 @@ export async function saveInspectionReport(
     ]);
     const structureChanged = (existingItems?.length ?? 0) !== normalizedItems.length || normalizedItems.some((item, index) => {
       const existing = existingItems?.[index];
-      return !existing || Number(existing.nominal_dimension) !== item.nominal || Number(existing.tolerance_min) !== item.min || Number(existing.tolerance_max) !== item.max;
+      return !existing || existing.nominal_dimension.trim() !== item.nominal || Number(existing.tolerance_min) !== item.min || Number(existing.tolerance_max) !== item.max;
     });
     const hasResults = (existingMeasurements ?? []).some((measurement) => Array.from({ length: 10 }, (_, index) => measurement[`result_${index + 1}` as keyof typeof measurement]).some((value) => value !== null));
     if (structureChanged && hasResults) return mutationError("측정결과가 입력된 성적서는 검사항목 구조를 변경할 수 없어요.");
@@ -145,6 +156,7 @@ export async function saveInspectionReport(
   if (!replaceItems) {
     revalidatePath(inspectionReportsPath);
     revalidatePath(inspectionMeasurementsPath);
+    revalidatePath(codeManagementPath);
     revalidatePath("/", "layout");
     return { status: "success", message: "검사성적서를 수정했어요.", reportSeq: reportSeq ?? undefined };
   }
@@ -152,6 +164,7 @@ export async function saveInspectionReport(
   if (normalizedItems.length === 0) {
     revalidatePath(inspectionReportsPath);
     revalidatePath(inspectionMeasurementsPath);
+    revalidatePath(codeManagementPath);
     revalidatePath("/", "layout");
     return { status: "success", message: seq ? "검사성적서를 수정했어요." : "검사성적서를 등록했어요.", reportSeq: reportSeq ?? undefined };
   }
@@ -159,7 +172,7 @@ export async function saveInspectionReport(
   const { data: insertedItems, error: itemError } = await supabase.from("inspection_report_items").insert(normalizedItems.map((item, index) => ({
     inspection_report_seq: reportSeq as number,
     sort_order: index + 1,
-    nominal_dimension: item.nominal as number,
+    nominal_dimension: item.nominal,
     tolerance_min: item.min as number,
     tolerance_max: item.max as number,
     marker_x_ratio: item.markerXRatio,
@@ -185,6 +198,7 @@ export async function saveInspectionReport(
 
   revalidatePath(inspectionReportsPath);
   revalidatePath(inspectionMeasurementsPath);
+  revalidatePath(codeManagementPath);
   revalidatePath("/", "layout");
   return { status: "success", message: seq ? "검사성적서를 수정했어요." : "검사성적서를 등록했어요.", reportSeq: reportSeq ?? undefined };
 }

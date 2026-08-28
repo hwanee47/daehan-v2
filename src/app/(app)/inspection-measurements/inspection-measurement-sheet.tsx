@@ -7,6 +7,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { cn } from "@/lib/utils";
 
 import { saveInspectionMeasurements } from "../inspection-reports/actions";
@@ -15,7 +16,7 @@ import type { InspectionReportActionState, InspectionReportData, InspectionRepor
 
 const initialState: InspectionReportActionState = { status: "idle" };
 
-function valueText(value: number | null | undefined) { return value === null || value === undefined ? "" : String(value); }
+function valueText(value: number | string | null | undefined) { return value === null || value === undefined ? "" : String(value); }
 
 function signedTolerance(value: string) {
   const number = Number(value);
@@ -73,6 +74,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const [fullscreen, setFullscreen] = useState(false);
   const [printDateTime, setPrintDateTime] = useState("");
   const [state, action, pending] = useActionState(saveInspectionMeasurements, initialState);
+  const onSaveFormKeyDown = useSaveFormShortcut();
   const handledRunSeq = useRef<number | null>(null);
   const currentItem = data.itemOptions.find((option) => option.seq === report?.item_detail_seq);
   const item = historyRun ? { seq: historyRun.item_detail_seq, item_detail_code: historyRun.item_detail_code, item_detail_name: historyRun.item_detail_name ?? historyRun.item_detail_code, material: historyRun.material, image_url: historyRun.image_url, item_name: historyRun.item_name ?? "", model_name: historyRun.model_name } : currentItem;
@@ -129,7 +131,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     </aside> : null}
 
     <section aria-label={isHistory ? "측정 이력 조회" : "측정결과 입력"} className={cn("min-w-0", fillContainer && "h-full min-h-0")}>
-    {!report ? <div className="flex min-h-72 items-center justify-center border-y border-border p-10 text-center text-muted-foreground">{isHistory ? reportRuns.length ? "조회할 회차를 선택해 주세요." : "저장 또는 인쇄 이력이 없어요." : "왼쪽 목록에서 측정할 검사성적서를 선택해 주세요."}</div> : <form action={action} className={cn("inspection-measurement-form flex min-w-0 flex-col gap-3", fillContainer ? "h-full min-h-0" : "@min-[1024px]/workspace:h-[calc(100svh-190px)]")}>
+    {!report ? <div className="flex min-h-72 items-center justify-center border-y border-border p-10 text-center text-muted-foreground">{isHistory ? reportRuns.length ? "조회할 회차를 선택해 주세요." : "저장 또는 인쇄 이력이 없어요." : "왼쪽 목록에서 측정할 검사성적서를 선택해 주세요."}</div> : <form action={action} className={cn("inspection-measurement-form flex min-w-0 flex-col gap-3", fillContainer ? "h-full min-h-0" : "@min-[1024px]/workspace:h-[calc(100svh-190px)]")} onKeyDown={onSaveFormKeyDown}>
       <input name="reportSeq" type="hidden" value={report.seq} /><input name="productTypeCodeSeq" type="hidden" value={selectedProductTypeSeq ?? ""} /><input name="items" type="hidden" value={JSON.stringify(rows)} />
       {isHistory && showHistorySelector ? <div className="inspection-print-hide flex flex-wrap items-center justify-end gap-2">
         <label className="text-sm font-medium" htmlFor="measurement-run">조회 회차</label>
@@ -171,7 +173,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
 	      <div className={cn("flex items-center justify-end gap-3 bg-background/95 backdrop-blur", floatingPrintButton ? "inspection-print-hide fixed bottom-6 right-6 z-[90] rounded-full border border-border p-2 shadow-xl sm:bottom-9 sm:right-9" : "sticky bottom-0 z-30 min-h-16 flex-wrap border-t border-border px-3 py-2 @min-[640px]/workspace:px-4")}>
         {!floatingPrintButton ? state.message ? <p className={cn("mr-auto text-sm", state.status === "error" ? "text-destructive" : "text-primary")} role="status">{state.message}</p> : <span className="mr-auto text-sm text-muted-foreground">입력한 측정결과를 저장해요.</span> : null}
 	        <Button disabled={pending} name="eventType" onClick={() => { preparePrint(); if (isHistory) window.setTimeout(openPrintDialog, 0); }} type={isHistory ? "button" : "submit"} value="print" variant="secondary"><Printer aria-hidden="true" />인쇄</Button>
-	        {!isHistory ? <Button disabled={pending} name="eventType" type="submit" value="save"><Save aria-hidden="true" />{pending ? "저장 중..." : "측정결과 저장"}</Button> : null}
+	        {!isHistory ? <Button data-save-submit="true" disabled={pending} name="eventType" type="submit" value="save"><Save aria-hidden="true" />{pending ? "저장 중..." : "측정결과 저장"}</Button> : null}
       </div>
     </form>}
     </section>

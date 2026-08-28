@@ -9,6 +9,7 @@ import { LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 
 import { deleteToleranceRange, saveToleranceRange } from "./actions";
@@ -142,6 +143,7 @@ function RangeEditor({
   range: ItemToleranceRange | null;
 }) {
   const [state, formAction, pending] = useActionState(saveToleranceRange, initialActionState);
+  const onSaveFormKeyDown = useSaveFormShortcut();
   const [lowerDeviation, setLowerDeviation] = useState(() => range ? String(range.lower_deviation) : "");
   const [upperDeviation, setUpperDeviation] = useState(() => range ? String(range.upper_deviation) : "");
   useEffect(() => {
@@ -161,7 +163,7 @@ function RangeEditor({
               {item.item_code}({item.item_name}) 품목의 치수 범위와 편차를 입력해 주세요.
             </Dialog.Description>
 
-            <form action={formAction} className="mt-6 space-y-4">
+            <form action={formAction} className="mt-6 space-y-4" onKeyDown={onSaveFormKeyDown}>
               {range ? <input name="seq" type="hidden" value={range.seq} /> : null}
               <input name="itemSeq" type="hidden" value={item.seq} />
               <div className="grid gap-4 sm:grid-cols-2">
@@ -199,7 +201,7 @@ function RangeEditor({
               <ActionMessage state={state} />
               <div className="flex justify-end gap-3 pt-2">
                 <Dialog.Close className="inline-flex h-12 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>취소</Dialog.Close>
-                <Button disabled={pending} type="submit">
+                <Button data-save-submit="true" disabled={pending} type="submit">
                   {pending ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}
                   저장하기
                 </Button>

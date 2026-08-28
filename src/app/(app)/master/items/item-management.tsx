@@ -9,6 +9,7 @@ import { ImageIcon, LoaderCircle, Maximize2, Pencil, Plus, Trash2, Upload, X } f
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { appGridSingleRowSelection, appGridTheme, syncSelectedGridRow } from "@/lib/ag-grid";
 import {
   itemImageAccept,
@@ -119,6 +120,7 @@ function DialogFrame({
 
 function ItemEditor({ item, onOpenChange, open }: { item: Item | null; onOpenChange: (open: boolean) => void; open: boolean }) {
   const [state, formAction, pending] = useActionState(saveItem, initialActionState);
+  const onSaveFormKeyDown = useSaveFormShortcut();
   useEffect(() => {
     if (state.status === "success") onOpenChange(false);
   }, [onOpenChange, state.status]);
@@ -130,7 +132,7 @@ function ItemEditor({ item, onOpenChange, open }: { item: Item | null; onOpenCha
       open={open}
       title={item ? "품목 수정" : "품목 추가"}
     >
-      <form action={formAction} className="mt-6 space-y-4">
+      <form action={formAction} className="mt-6 space-y-4" onKeyDown={onSaveFormKeyDown}>
         {item ? <input name="seq" type="hidden" value={item.seq} /> : null}
         <div className="space-y-2">
           <label className="font-semibold" htmlFor="item-code">품목코드</label>
@@ -155,7 +157,7 @@ function ItemEditor({ item, onOpenChange, open }: { item: Item | null; onOpenCha
         <ActionMessage state={state} />
         <div className="flex justify-end gap-3 pt-2">
           <Dialog.Close className="inline-flex h-12 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>취소</Dialog.Close>
-          <Button disabled={pending} type="submit">{pending ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}저장하기</Button>
+          <Button data-save-submit="true" disabled={pending} type="submit">{pending ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}저장하기</Button>
         </div>
       </form>
     </DialogFrame>
@@ -164,6 +166,7 @@ function ItemEditor({ item, onOpenChange, open }: { item: Item | null; onOpenCha
 
 function DetailEditor({ detail, item, onOpenChange, open }: { detail: ItemDetail | null; item: Item; onOpenChange: (open: boolean) => void; open: boolean }) {
   const [state, formAction, pending] = useActionState(saveItemDetail, initialActionState);
+  const onSaveFormKeyDown = useSaveFormShortcut();
   useEffect(() => {
     if (state.status === "success") onOpenChange(false);
   }, [onOpenChange, state.status]);
@@ -175,7 +178,7 @@ function DetailEditor({ detail, item, onOpenChange, open }: { detail: ItemDetail
       open={open}
       title={detail ? "품목상세 수정" : "품목상세 추가"}
     >
-      <form action={formAction} className="mt-6 space-y-4">
+      <form action={formAction} className="mt-6 space-y-4" onKeyDown={onSaveFormKeyDown}>
         {detail ? <input name="seq" type="hidden" value={detail.seq} /> : null}
         <input name="itemSeq" type="hidden" value={item.seq} />
         <div className="space-y-2">
@@ -201,7 +204,7 @@ function DetailEditor({ detail, item, onOpenChange, open }: { detail: ItemDetail
         <ActionMessage state={state} />
         <div className="flex justify-end gap-3 pt-2">
           <Dialog.Close className="inline-flex h-12 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>취소</Dialog.Close>
-          <Button disabled={pending} type="submit">{pending ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}저장하기</Button>
+          <Button data-save-submit="true" disabled={pending} type="submit">{pending ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : null}저장하기</Button>
         </div>
       </form>
     </DialogFrame>
