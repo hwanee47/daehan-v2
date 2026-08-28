@@ -108,7 +108,6 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   useEffect(() => {
     if (state.status !== "success" || !state.runSeq || handledRunSeq.current === state.runSeq) return;
     handledRunSeq.current = state.runSeq;
-    if (state.eventType === "print") window.setTimeout(openPrintDialog, 0);
     router.refresh();
   }, [router, state]);
 
@@ -173,7 +172,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
       </div>
 	      <div className={cn("flex items-center justify-end gap-3 bg-background/95 backdrop-blur", floatingPrintButton ? "inspection-print-hide fixed bottom-6 right-6 z-[90] rounded-full border border-border p-2 shadow-xl sm:bottom-9 sm:right-9" : "sticky bottom-0 z-30 min-h-16 flex-wrap border-t border-border px-3 py-2 @min-[640px]/workspace:px-4")}>
         {!floatingPrintButton ? state.message ? <p className={cn("mr-auto text-sm", state.status === "error" ? "text-destructive" : "text-primary")} role="status">{state.message}</p> : <span className="mr-auto text-sm text-muted-foreground">입력한 측정결과를 저장해요.</span> : null}
-	        <Button disabled={pending} name="eventType" onClick={() => { preparePrint(); if (isHistory) window.setTimeout(openPrintDialog, 0); }} type={isHistory ? "button" : "submit"} value="print" variant="secondary"><Printer aria-hidden="true" />인쇄</Button>
+	        <Button disabled={pending} onClick={() => { preparePrint(); window.setTimeout(openPrintDialog, 0); }} type="button" variant="secondary"><Printer aria-hidden="true" />인쇄</Button>
 	        {!isHistory ? <Button data-save-submit="true" disabled={pending} name="eventType" type="submit" value="save"><Save aria-hidden="true" />{pending ? "저장 중..." : "측정결과 저장"}</Button> : null}
       </div>
     </form>}

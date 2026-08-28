@@ -295,7 +295,7 @@ export async function saveInspectionMeasurements(
   const reportSeq = positiveInteger(text(formData, "reportSeq"));
   const productTypeCodeText = text(formData, "productTypeCodeSeq");
   const productTypeCodeSeq = optionalPositiveInteger(productTypeCodeText);
-  const eventType = text(formData, "eventType") === "print" ? "print" : "save";
+  const eventType = "save" as const;
   const rows = parseItems(text(formData, "items"));
   if (!reportSeq || !rows || productTypeCodeText && !productTypeCodeSeq) return mutationError("측정할 성적서와 제품구분, 결과를 확인해 주세요.");
 
@@ -337,5 +337,5 @@ export async function saveInspectionMeasurements(
   revalidatePath(inspectionReportsPath);
   revalidatePath(inspectionMeasurementsPath);
   revalidatePath("/", "layout");
-  return { status: "success", message: eventType === "print" ? "인쇄 이력을 저장했어요." : "측정결과와 이력을 저장했어요.", reportSeq, runSeq, eventType };
+  return { status: "success", message: "측정결과와 이력을 저장했어요.", reportSeq, runSeq, eventType };
 }
