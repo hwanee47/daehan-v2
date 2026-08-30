@@ -29,13 +29,13 @@ const textareaClassName =
   "min-h-24 w-full resize-y rounded-sm border border-input bg-background px-4 py-3 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive";
 
 const itemColumns: ColDef<Item>[] = [
-  { field: "item_code", headerName: "품목코드", minWidth: 150, flex: 1 },
+  { field: "item_code", headerName: "품목코드", minWidth: 150, flex: 1, sort: "asc", sortIndex: 0 },
   { field: "item_name", headerName: "품목명", minWidth: 170, flex: 1.2 },
   { field: "model_name", headerName: "모델명", minWidth: 150, flex: 1 },
 ];
 
 const detailColumns: ColDef<ItemDetail>[] = [
-  { field: "item_detail_code", headerName: "상세코드", minWidth: 150, flex: 1 },
+  { field: "item_detail_code", headerName: "상세코드", minWidth: 150, flex: 1, sort: "asc", sortIndex: 0 },
   { field: "item_detail_name", headerName: "상세명", minWidth: 170, flex: 1.2 },
   { field: "material", headerName: "소재", minWidth: 130, flex: 0.8 },
   { field: "note", headerName: "비고", minWidth: 180, flex: 1.2 },
