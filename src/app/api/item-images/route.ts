@@ -85,6 +85,21 @@ async function removeObject(supabase: SupabaseClient, path: string) {
   }
 }
 
+async function removeObjectIfUnreferenced(supabase: SupabaseClient, path: string) {
+  const [reportResult, runResult] = await Promise.all([
+    supabase.from("inspection_reports").select("seq").eq("image_path", path).limit(1),
+    supabase.from("inspection_measurement_runs").select("seq").eq("image_path", path).limit(1),
+  ]);
+  if (reportResult.error || runResult.error) {
+    console.error("Failed to verify inspection image references", {
+      codes: [reportResult.error?.code, runResult.error?.code].filter(Boolean),
+    });
+    return;
+  }
+  if ((reportResult.data?.length ?? 0) > 0 || (runResult.data?.length ?? 0) > 0) return;
+  await removeObject(supabase, path);
+}
+
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) return errorResponse("허용되지 않은 요청이에요.", 403);
 
@@ -148,7 +163,7 @@ export async function POST(request: Request) {
     return errorResponse("이미지를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.", 500);
   }
 
-  if (record.image_path) await removeObject(supabase, record.image_path);
+  if (record.image_path) await removeObjectIfUnreferenced(supabase, record.image_path);
 
   const { data: signedUrl, error: signedUrlError } = await supabase.storage
     .from(itemImageBucket)
@@ -198,7 +213,7 @@ export async function DELETE(request: Request) {
     return errorResponse("이미지를 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.", 500);
   }
 
-  await removeObject(supabase, record.image_path);
+  await removeObjectIfUnreferenced(supabase, record.image_path);
 
   return NextResponse.json({ imagePath: null, imageUrl: null, message: "이미지를 삭제했어요." });
 }

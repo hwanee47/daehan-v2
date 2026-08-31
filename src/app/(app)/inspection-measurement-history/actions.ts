@@ -9,7 +9,7 @@ import type { MeasurementHistoryDetail, MeasurementHistoryPage, MeasurementHisto
 
 const pageSize = 50;
 const searchColumns = { model: "model_name", drawing: "item_detail_code", itemName: "item_name", customer: "customer_name" } as const;
-const runColumns = "seq, inspection_report_seq, run_no, event_type, model_name, item_detail_seq, item_detail_code, item_detail_name, item_name, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, material, hardness, heat_treatment, image_path, created_at";
+const runColumns = "seq, inspection_report_seq, run_no, event_type, model_name, item_code, item_detail_seq, item_detail_code, item_detail_name, item_name, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, material, hardness, heat_treatment, image_path, created_at";
 const runItemColumns = "seq, measurement_run_seq, source_report_item_seq, sort_order, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio, result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10, note";
 
 function validDate(value: string) {

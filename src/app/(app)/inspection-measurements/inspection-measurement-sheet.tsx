@@ -54,9 +54,10 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const historyRun = viewMode === "history" ? data.measurementRuns.find((run) => run.seq === selectedRunSeq) ?? null : null;
   const isHistory = viewMode === "history";
   const report = historyRun ? {
-    seq: historyRun.inspection_report_seq, model_name: historyRun.model_name, item_detail_seq: historyRun.item_detail_seq,
-    item_detail_code: historyRun.item_detail_code, customer_name: historyRun.customer_name, supplier_name: historyRun.supplier_name,
+    seq: historyRun.inspection_report_seq, model_name: historyRun.model_name, item_code: historyRun.item_code, item_name: historyRun.item_name ?? "", item_detail_seq: historyRun.item_detail_seq,
+    item_detail_code: historyRun.item_detail_code, item_detail_name: historyRun.item_detail_name ?? historyRun.item_detail_code, material: historyRun.material, image_path: historyRun.image_path, image_url: historyRun.image_url, customer_name: historyRun.customer_name, supplier_name: historyRun.supplier_name,
     delivery_quantity: historyRun.delivery_quantity, sample_count: historyRun.sample_count, product_type_code_seq: historyRun.product_type_code_seq,
+    product_type_code: historyRun.product_type_code, product_type_name: historyRun.product_type_name,
     hardness: historyRun.hardness, heat_treatment: historyRun.heat_treatment, final_judgment_code_seq: null,
   } : isHistory ? null : currentReport;
   const reportItems = historyRun ? data.measurementRunItems.filter((item) => item.measurement_run_seq === historyRun.seq).map((item) => ({
@@ -77,10 +78,9 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const [state, action, pending] = useActionState(saveInspectionMeasurements, initialState);
   const onSaveFormKeyDown = useSaveFormShortcut();
   const handledRunSeq = useRef<number | null>(null);
-  const currentItem = data.itemOptions.find((option) => option.seq === report?.item_detail_seq);
-  const item = historyRun ? { seq: historyRun.item_detail_seq, item_detail_code: historyRun.item_detail_code, item_detail_name: historyRun.item_detail_name ?? historyRun.item_detail_code, material: historyRun.material, image_url: historyRun.image_url, item_name: historyRun.item_name ?? "", model_name: historyRun.model_name } : currentItem;
+  const item = report ? { seq: report.item_detail_seq, item_detail_code: report.item_detail_code, item_detail_name: report.item_detail_name, material: report.material, image_url: report.image_url, item_name: report.item_name, model_name: report.model_name } : undefined;
   const productCodes = data.codes.filter((code) => code.group_code === "U0002");
-  const productName = data.codes.find((code) => code.seq === report?.product_type_code_seq)?.code_name ?? "";
+  const productName = report?.product_type_name ?? "";
   const markers = reportItems.flatMap((reportItem) => reportItem.marker_x_ratio === null || reportItem.marker_y_ratio === null ? [] : [{ x: reportItem.marker_x_ratio, y: reportItem.marker_y_ratio, label: reportItem.sort_order }]);
   const judgmentNameBySeq = useMemo(() => new Map(data.codes.filter((code) => code.group_code === "FINAL_JUDGMENT_STATUS").map((code) => [code.seq, code.code_name])), [data.codes]);
 

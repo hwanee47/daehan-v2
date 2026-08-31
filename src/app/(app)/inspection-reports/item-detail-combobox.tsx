@@ -28,7 +28,7 @@ function matches(item: InspectionItemOption, query: string) {
 }
 
 function optionDescription(item: InspectionItemOption) {
-  return [item.item_name, item.model_name, item.material].filter(Boolean).join(" · ");
+  return item.model_name?.trim() ?? "";
 }
 
 export function ItemDetailCombobox({
@@ -109,9 +109,7 @@ export function ItemDetailCombobox({
                   </Combobox.ItemIndicator>
                   <span className="min-w-0 whitespace-nowrap">
                     <strong className="font-semibold">{optionLabel(item)}</strong>
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      · {optionDescription(item) || "추가 정보가 없어요."}
-                    </span>
+                    {optionDescription(item) ? <span className="ml-2 text-xs text-muted-foreground">· {optionDescription(item)}</span> : null}
                   </span>
                 </Combobox.Item>
               )}

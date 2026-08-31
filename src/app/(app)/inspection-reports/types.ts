@@ -1,13 +1,21 @@
 export type InspectionReport = {
   seq: number;
   model_name: string;
+  item_code: string;
+  item_name: string;
   item_detail_seq: number;
   item_detail_code: string;
+  item_detail_name: string;
+  material: string | null;
+  image_path: string | null;
+  image_url: string | null;
   customer_name: string | null;
   supplier_name: string | null;
   delivery_quantity: number | null;
   sample_count: number | null;
   product_type_code_seq: number | null;
+  product_type_code: string | null;
+  product_type_name: string | null;
   hardness: string | null;
   heat_treatment: string | null;
   final_judgment_code_seq: number | null;
@@ -47,6 +55,7 @@ export type InspectionMeasurementRun = {
   run_no: number;
   event_type: "save" | "print" | "migration";
   model_name: string;
+  item_code: string;
   item_detail_seq: number;
   item_detail_code: string;
   item_detail_name: string | null;

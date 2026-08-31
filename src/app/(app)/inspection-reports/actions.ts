@@ -2,7 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
+import { itemImageBucket } from "@/lib/item-images";
 import { createClient } from "@/lib/supabase/server";
+import { createSignedFileUrls } from "@/lib/supabase/storage";
 
 import type { InspectionReport, InspectionReportActionState, InspectionReportDraftItem, InspectionReportPage, InspectionReportQuery, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
 
@@ -10,8 +12,8 @@ const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
 const codeManagementPath = "/master/codes";
 const reportPageSize = 50;
-const reportColumns = "seq, model_name, item_detail_seq, item_detail_code, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, hardness, heat_treatment, final_judgment_code_seq";
-const reportSearchColumns = { model: "model_name", drawing: "item_detail_code", customer: "customer_name", supplier: "supplier_name" } as const;
+const reportColumns = "seq, model_name, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
+const reportSearchColumns = { model: "model_name", drawing: "item_detail_code", itemName: "item_name", customer: "customer_name", supplier: "supplier_name" } as const;
 
 function safeSearchTerm(value: string) {
   return value.trim().slice(0, 100).replace(/[,*()"\\]/g, " ").replace(/\s+/g, " ");
@@ -24,24 +26,10 @@ export async function searchInspectionReports(query: InspectionReportQuery): Pro
   if (!user) return { rows: [], total: 0, page, pageSize: reportPageSize, error: "로그인이 필요해요." };
 
   const keyword = safeSearchTerm(query.keyword);
-  let matchingItemDetailSeqs: number[] = [];
-  if (keyword && (query.searchField === "all" || query.searchField === "itemName")) {
-    const { data, error } = await supabase.from("item_details").select("seq, items!inner(item_name)").ilike("items.item_name", `%${keyword}%`);
-    if (error) {
-      console.error("Failed to resolve report item-name search", { code: error.code });
-      return { rows: [], total: 0, page, pageSize: reportPageSize, error: "검사성적서를 조회하지 못했어요." };
-    }
-    matchingItemDetailSeqs = (data ?? []).map((row) => row.seq);
-  }
-
   let request = supabase.from("inspection_reports").select(reportColumns, { count: "exact" });
   if (keyword) {
-    if (query.searchField === "itemName") {
-      if (!matchingItemDetailSeqs.length) return { rows: [], total: 0, page, pageSize: reportPageSize, error: null };
-      request = request.in("item_detail_seq", matchingItemDetailSeqs);
-    } else if (query.searchField === "all") {
-      const filters = ["model_name", "item_detail_code", "customer_name", "supplier_name"].map((column) => `${column}.ilike.*${keyword}*`);
-      if (matchingItemDetailSeqs.length) filters.push(`item_detail_seq.in.(${matchingItemDetailSeqs.join(",")})`);
+    if (query.searchField === "all") {
+      const filters = ["model_name", "item_code", "item_name", "item_detail_code", "item_detail_name", "customer_name", "supplier_name"].map((column) => `${column}.ilike.*${keyword}*`);
       request = request.or(filters.join(","));
     } else {
       const column = reportSearchColumns[query.searchField as keyof typeof reportSearchColumns];
@@ -56,7 +44,20 @@ export async function searchInspectionReports(query: InspectionReportQuery): Pro
     console.error("Failed to search inspection reports", { code: error.code });
     return { rows: [], total: 0, page, pageSize: reportPageSize, error: "검사성적서를 조회하지 못했어요." };
   }
-  return { rows: (data ?? []) as InspectionReport[], total: count ?? 0, page, pageSize: reportPageSize, error: null };
+  const rows = (data ?? []) as Omit<InspectionReport, "image_url">[];
+  let signedUrls = new Map<string, string>();
+  try {
+    signedUrls = await createSignedFileUrls(supabase, itemImageBucket, rows.map((row) => row.image_path));
+  } catch (signError) {
+    console.error("Failed to sign inspection report image URLs", { message: signError instanceof Error ? signError.message : "Unknown storage error" });
+  }
+  return {
+    rows: rows.map((row) => ({ ...row, image_url: row.image_path ? signedUrls.get(row.image_path) ?? null : null })),
+    total: count ?? 0,
+    page,
+    pageSize: reportPageSize,
+    error: null,
+  };
 }
 
 function text(formData: FormData, key: string) {

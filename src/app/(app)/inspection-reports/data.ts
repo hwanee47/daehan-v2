@@ -17,7 +17,7 @@ export async function getInspectionReportData(): Promise<InspectionReportData> {
   const supabase = await createClient();
   const [reportsResult, itemsResult, measurementsResult, detailsResult, codesResult] =
     await Promise.all([
-      supabase.from("inspection_reports").select("seq, model_name, item_detail_seq, item_detail_code, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, hardness, heat_treatment, final_judgment_code_seq").order("created_at", { ascending: false }).order("seq", { ascending: false }),
+      supabase.from("inspection_reports").select("seq, model_name, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq").order("created_at", { ascending: false }).order("seq", { ascending: false }),
       supabase.from("inspection_report_items").select("seq, sort_order, inspection_report_seq, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio").order("inspection_report_seq").order("sort_order"),
       supabase.from("inspection_report_measurements").select("seq, inspection_report_seq, inspection_report_item_seq, result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10, note").order("inspection_report_seq").order("inspection_report_item_seq"),
       supabase.from("item_details").select("seq, item_detail_code, item_detail_name, material, image_path, items!inner(item_name, model_name)").order("item_detail_code"),
@@ -33,13 +33,13 @@ export async function getInspectionReportData(): Promise<InspectionReportData> {
   }>;
   let signedUrls = new Map<string, string>();
   try {
-    signedUrls = await createSignedFileUrls(supabase, itemImageBucket, detailRows.map((detail) => detail.image_path));
+    signedUrls = await createSignedFileUrls(supabase, itemImageBucket, [...detailRows.map((detail) => detail.image_path), ...(reportsResult.data ?? []).map((report) => report.image_path)]);
   } catch (error) {
     console.error("Failed to create inspection item image URLs", { message: error instanceof Error ? error.message : "Unknown storage error" });
   }
 
   return {
-    reports: (reportsResult.data ?? []) as InspectionReport[],
+    reports: (reportsResult.data ?? []).map((report) => ({ ...report, image_url: report.image_path ? signedUrls.get(report.image_path) ?? null : null })) as InspectionReport[],
     items: (itemsResult.data ?? []) as InspectionReportItem[],
     measurements: (measurementsResult.data ?? []) as InspectionReportMeasurement[],
     measurementRuns: [],
