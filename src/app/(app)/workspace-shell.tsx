@@ -11,16 +11,16 @@ import {
   useUiStore,
 } from "@/stores/ui-store";
 
+import { WorkspacePanel } from "./workspace-panels";
+
 const subscribeToClient = () => () => undefined;
 
 export function WorkspaceShell({
   allowedTabHrefs,
   children,
-  panels,
 }: {
   allowedTabHrefs: AppTabHref[];
   children: React.ReactNode;
-  panels: Partial<Record<AppTabHref, React.ReactNode>>;
 }) {
   const isHydrated = useSyncExternalStore(subscribeToClient, () => true, () => false);
   const activeTabHref = useUiStore((state) => state.activeTabHref);
@@ -108,7 +108,7 @@ export function WorkspaceShell({
         }
       >
         {openTabHrefs.map((href) => {
-          if (!allowedTabs.has(href) || !panels[href]) return null;
+          if (!allowedTabs.has(href)) return null;
           const isPrimary = visibleTabHref === href;
           const isSecondary = secondaryTabHref === href;
 
@@ -126,7 +126,7 @@ export function WorkspaceShell({
                 id={`workspace-panel-${href.replaceAll("/", "-")}`}
                 role="tabpanel"
               >
-                {panels[href]}
+                <WorkspacePanel href={href} isVisible={isPrimary || isSecondary} />
               </section>
 
               {isPrimary && secondaryTabHref ? (

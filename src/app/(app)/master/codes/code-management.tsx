@@ -129,10 +129,12 @@ function DialogFrame({
 
 function GroupEditor({
   group,
+  onChanged,
   onOpenChange,
   open,
 }: {
   group: CodeGroup | null;
+  onChanged?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }) {
@@ -140,8 +142,8 @@ function GroupEditor({
   const onSaveFormKeyDown = useSaveFormShortcut();
 
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") { onOpenChange(false); onChanged?.(); }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <DialogFrame
@@ -234,12 +236,14 @@ function DetailEditor({
   defaultCode,
   detail,
   group,
+  onChanged,
   onOpenChange,
   open,
 }: {
   defaultCode: string;
   detail: CodeDetail | null;
   group: CodeGroup;
+  onChanged?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }) {
@@ -247,8 +251,8 @@ function DetailEditor({
   const onSaveFormKeyDown = useSaveFormShortcut();
 
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") { onOpenChange(false); onChanged?.(); }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <DialogFrame
@@ -340,12 +344,14 @@ function DetailEditor({
 function DeleteDialog({
   action,
   itemName,
+  onChanged,
   onOpenChange,
   open,
   seq,
 }: {
   action: ServerFormAction;
   itemName: string;
+  onChanged?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   seq: number;
@@ -353,8 +359,8 @@ function DeleteDialog({
   const [state, formAction, pending] = useActionState(action, initialActionState);
 
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") { onOpenChange(false); onChanged?.(); }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -389,13 +395,16 @@ function DeleteDialog({
 function ToggleForm({
   action,
   isActive,
+  onChanged,
   seq,
 }: {
   action: ServerFormAction;
   isActive: boolean;
+  onChanged?: () => void;
   seq: number;
 }) {
   const [state, formAction, pending] = useActionState(action, initialActionState);
+  useEffect(() => { if (state.status === "success") onChanged?.(); }, [onChanged, state.status]);
 
   return (
     <div>
@@ -412,7 +421,7 @@ function ToggleForm({
   );
 }
 
-export function CodeManagement({ details, groups }: { details: CodeDetail[]; groups: CodeGroup[] }) {
+export function CodeManagement({ details, groups, onDataChanged }: { details: CodeDetail[]; groups: CodeGroup[]; onDataChanged?: () => void }) {
   const [selectedGroupSeq, setSelectedGroupSeq] = useState<number | null>(groups[0]?.seq ?? null);
   const [selectedDetailSeq, setSelectedDetailSeq] = useState<number | null>(null);
   const [groupEditorOpen, setGroupEditorOpen] = useState(false);
@@ -481,6 +490,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
               action={toggleCodeGroup}
               isActive={selectedGroup.is_active}
               key={`group-toggle-${selectedGroup.seq}-${selectedGroup.is_active}`}
+              onChanged={onDataChanged}
               seq={selectedGroup.seq}
             />
           ) : null}
@@ -552,6 +562,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
               action={toggleCodeDetail}
               isActive={selectedDetail.is_active}
               key={`detail-toggle-${selectedDetail.seq}-${selectedDetail.is_active}`}
+              onChanged={onDataChanged}
               seq={selectedDetail.seq}
             />
           ) : null}
@@ -591,6 +602,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
       <GroupEditor
         group={editingGroup}
         key={`group-editor-${editingGroup?.seq ?? "new"}-${groupEditorOpen}`}
+        onChanged={onDataChanged}
         onOpenChange={setGroupEditorOpen}
         open={groupEditorOpen}
       />
@@ -600,6 +612,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
           detail={editingDetail}
           group={selectedGroup}
           key={`detail-editor-${editingDetail?.seq ?? "new"}-${detailEditorOpen}`}
+          onChanged={onDataChanged}
           onOpenChange={setDetailEditorOpen}
           open={detailEditorOpen}
         />
@@ -609,6 +622,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
           action={deleteCodeGroup}
           itemName={`코드그룹 “${groupDeleteTarget.group_name}”`}
           key={`group-delete-${groupDeleteTarget.seq}`}
+          onChanged={onDataChanged}
           onOpenChange={(open) => { if (!open) setGroupDeleteTarget(null); }}
           open
           seq={groupDeleteTarget.seq}
@@ -619,6 +633,7 @@ export function CodeManagement({ details, groups }: { details: CodeDetail[]; gro
           action={deleteCodeDetail}
           itemName={`상세 코드 “${detailDeleteTarget.code_name}”`}
           key={`detail-delete-${detailDeleteTarget.seq}`}
+          onChanged={onDataChanged}
           onOpenChange={(open) => { if (!open) setDetailDeleteTarget(null); }}
           open
           seq={detailDeleteTarget.seq}

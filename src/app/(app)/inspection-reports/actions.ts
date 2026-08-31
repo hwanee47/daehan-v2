@@ -169,17 +169,49 @@ export async function saveInspectionReport(
 
   let reportSeq = seq;
   let replaceItems = true;
+  let resetMeasurementsToNewStructure = false;
   if (seq) {
-    const [{ data: existingItems }, { data: existingMeasurements }] = await Promise.all([
+    const [{ data: existingItems, error: existingItemsError }, { data: existingMeasurements, error: existingMeasurementsError }] = await Promise.all([
       supabase.from("inspection_report_items").select("seq, sort_order, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio").eq("inspection_report_seq", seq).order("sort_order"),
-      supabase.from("inspection_report_measurements").select("result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10").eq("inspection_report_seq", seq),
+      supabase.from("inspection_report_measurements").select("result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10, note").eq("inspection_report_seq", seq),
     ]);
+    if (existingItemsError || existingMeasurementsError) {
+      console.error("Failed to load current inspection report structure before update", { itemCode: existingItemsError?.code, measurementCode: existingMeasurementsError?.code });
+      return mutationError("현재 검사항목과 측정결과를 확인하지 못해 수정하지 않았어요.");
+    }
     const structureChanged = (existingItems?.length ?? 0) !== normalizedItems.length || normalizedItems.some((item, index) => {
       const existing = existingItems?.[index];
       return !existing || existing.nominal_dimension.trim() !== item.nominal || Number(existing.tolerance_min) !== item.min || Number(existing.tolerance_max) !== item.max;
     });
-    const hasResults = (existingMeasurements ?? []).some((measurement) => Array.from({ length: 10 }, (_, index) => measurement[`result_${index + 1}` as keyof typeof measurement]).some((value) => value !== null));
-    if (structureChanged && hasResults) return mutationError("측정결과가 입력된 성적서는 검사항목 구조를 변경할 수 없어요.");
+    const hasResults = (existingMeasurements ?? []).some((measurement) =>
+      Array.from({ length: 10 }, (_, index) => measurement[`result_${index + 1}` as keyof typeof measurement]).some((value) => value !== null)
+      || Boolean(measurement.note?.trim()),
+    );
+    if (structureChanged && hasResults) {
+      const { data: latestRun, error: runError } = await supabase
+        .from("inspection_measurement_runs")
+        .select("seq")
+        .eq("inspection_report_seq", seq)
+        .order("run_no", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (runError || !latestRun) {
+        console.error("Failed to verify inspection measurement history before replacing items", { code: runError?.code });
+        return mutationError("현재 측정결과의 과거 이력을 확인하지 못해 검사항목을 변경하지 않았어요.");
+      }
+      const { data: historyItems, error: historyItemsError } = await supabase
+        .from("inspection_measurement_run_items")
+        .select("source_report_item_seq")
+        .eq("measurement_run_seq", latestRun.seq);
+      const currentItemSeqs = new Set((existingItems ?? []).map((item) => item.seq));
+      const hasCurrentStructureSnapshot = (historyItems?.length ?? 0) === currentItemSeqs.size
+        && (historyItems ?? []).every((item) => item.source_report_item_seq !== null && currentItemSeqs.has(item.source_report_item_seq));
+      if (historyItemsError || !hasCurrentStructureSnapshot) {
+        console.error("Inspection measurement history does not match current item structure", { code: historyItemsError?.code });
+        return mutationError("현재 측정결과와 일치하는 과거 이력을 확인하지 못해 검사항목을 변경하지 않았어요.");
+      }
+      resetMeasurementsToNewStructure = true;
+    }
     replaceItems = structureChanged;
     const { error } = await supabase.from("inspection_reports").update(masterValues).eq("seq", seq);
     if (error) { console.error("Failed to update inspection report", { code: error.code }); return mutationError(error.code === "23514" ? "제품구분 코드를 확인해 주세요." : undefined); }
@@ -216,7 +248,7 @@ export async function saveInspectionReport(
     revalidatePath(inspectionMeasurementsPath);
     revalidatePath(codeManagementPath);
     revalidatePath("/", "layout");
-    return { status: "success", message: seq ? "검사성적서를 수정했어요." : "검사성적서를 등록했어요.", reportSeq: reportSeq ?? undefined };
+    return { status: "success", message: resetMeasurementsToNewStructure ? "검사항목을 변경했어요. 이전 측정결과는 이력에 유지되고 현재 결과는 초기화됐어요." : seq ? "검사성적서를 수정했어요." : "검사성적서를 등록했어요.", reportSeq: reportSeq ?? undefined };
   }
 
   const { data: insertedItems, error: itemError } = await supabase.from("inspection_report_items").insert(normalizedItems.map((item, index) => ({
@@ -250,7 +282,7 @@ export async function saveInspectionReport(
   revalidatePath(inspectionMeasurementsPath);
   revalidatePath(codeManagementPath);
   revalidatePath("/", "layout");
-  return { status: "success", message: seq ? "검사성적서를 수정했어요." : "검사성적서를 등록했어요.", reportSeq: reportSeq ?? undefined };
+  return { status: "success", message: resetMeasurementsToNewStructure ? "검사항목을 변경했어요. 이전 측정결과는 이력에 유지되고 현재 결과는 초기화됐어요." : seq ? "검사성적서를 수정했어요." : "검사성적서를 등록했어요.", reportSeq: reportSeq ?? undefined };
 }
 
 export async function getInspectionToleranceRanges(itemDetailSeq: number): Promise<InspectionToleranceRangeResult> {

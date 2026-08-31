@@ -2,10 +2,11 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
-import { ChevronLeft, ChevronRight, Expand, FilePlus2, MapPin, Pencil, Plus, Search, Trash2, X } from "lucide-react";
-import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { ChevronLeft, ChevronRight, Expand, FilePlus2, MapPin, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { SearchConditions } from "@/components/ui/search-conditions";
 import { Select } from "@/components/ui/select";
 import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
@@ -75,7 +76,10 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
   const [sampleCount, setSampleCount] = useState(report?.sample_count ? String(report.sample_count) : "");
   const [fullscreen, setFullscreen] = useState(false);
   const [markerDialogOpen, setMarkerDialogOpen] = useState(false);
+  const [structureChangeConfirmOpen, setStructureChangeConfirmOpen] = useState(false);
   const [editorStep, setEditorStep] = useState<"basic" | "items">("basic");
+  const formRef = useRef<HTMLFormElement>(null);
+  const structureChangeConfirmedRef = useRef(false);
   const initialItems = useMemo(() => {
     if (!report) return [];
     return data.items.filter((item) => item.inspection_report_seq === report.seq).map((item) => {
@@ -103,6 +107,14 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
     .sort((left, right) => left.code_name.localeCompare(right.code_name, "ko-KR", { numeric: true }))
     .map((code) => code.code_name);
   const markers = rows.flatMap((row, index) => row.markerXRatio === null || row.markerYRatio === null ? [] : [{ x: row.markerXRatio, y: row.markerYRatio, label: index + 1 }]);
+  const hasSavedMeasurements = initialItems.some((item) => item.results.some((result) => result.trim() !== "") || item.note.trim() !== "");
+  const structureChanged = initialItems.length !== rows.length || rows.some((row, index) => {
+    const initial = initialItems[index];
+    return !initial
+      || initial.nominalDimension.trim() !== row.nominalDimension.trim()
+      || Number(initial.toleranceMin) !== Number(row.toleranceMin)
+      || Number(initial.toleranceMax) !== Number(row.toleranceMax);
+  });
 
   useEffect(() => { if (state.status === "success") { onOpenChange(false); onSaved(state.reportSeq); } }, [onOpenChange, onSaved, state.reportSeq, state.status]);
 
@@ -174,7 +186,12 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
               <button aria-controls="report-editor-items" aria-selected={editorStep === "items"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", editorStep === "items" ? "border-primary text-primary" : "border-transparent text-muted-foreground")} id="report-editor-tab-items" onClick={() => setEditorStep("items")} onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); setEditorStep("basic"); } }} role="tab" type="button">2. 검사항목 · 순번 ({rows.length})</button>
             </div>
 
-            <form action={formAction} className="flex min-h-0 flex-1 flex-col" onKeyDown={onSaveFormKeyDown}>
+            <form action={formAction} className="flex min-h-0 flex-1 flex-col" onKeyDown={onSaveFormKeyDown} onSubmit={(event) => {
+              if (report && hasSavedMeasurements && structureChanged && !structureChangeConfirmedRef.current) {
+                event.preventDefault();
+                setStructureChangeConfirmOpen(true);
+              }
+            }} ref={formRef}>
               <input name="seq" type="hidden" value={report?.seq ?? ""} />
               <input name="items" type="hidden" value={JSON.stringify(rows)} />
               <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
@@ -225,6 +242,26 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
       </WorkspaceDialogPortal>
       {fullscreen && selectedItem?.image_url ? <FullscreenImage label={selectedItem.item_detail_name} markers={markers} onClose={() => setFullscreen(false)} url={selectedItem.image_url} /> : null}
       {markerDialogOpen && selectedItem?.image_url ? <InspectionMarkerPositionDialog imageLabel={selectedItem.item_detail_name} imageUrl={selectedItem.image_url} onApply={(positions) => setRows((current) => current.map((row, index) => ({ ...row, ...positions[index] })))} onOpenChange={setMarkerDialogOpen} open={markerDialogOpen} rows={rows} /> : null}
+      <AlertDialog.Root open={structureChangeConfirmOpen} onOpenChange={setStructureChangeConfirmOpen}>
+        <WorkspaceAlertDialogPortal>
+          <AlertDialog.Backdrop className="fixed inset-0 z-[80] bg-foreground/30 backdrop-blur-[2px]" />
+          <AlertDialog.Viewport className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <AlertDialog.Popup className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl outline-none">
+              <AlertDialog.Title className="text-xl font-semibold">검사항목 구조를 변경할까요?</AlertDialog.Title>
+              <AlertDialog.Description className="mt-3 text-muted-foreground">현재 입력된 측정결과는 결과입력 화면에서 초기화돼요. 기존 결과와 당시 검사항목은 측정이력에 그대로 유지됩니다.</AlertDialog.Description>
+              <div className="mt-6 flex justify-end gap-3">
+                <AlertDialog.Close className="inline-flex h-11 items-center rounded-xl bg-secondary px-5 font-semibold">취소</AlertDialog.Close>
+                <Button onClick={() => {
+                  structureChangeConfirmedRef.current = true;
+                  setStructureChangeConfirmOpen(false);
+                  formRef.current?.requestSubmit();
+                  queueMicrotask(() => { structureChangeConfirmedRef.current = false; });
+                }} type="button">이력 유지하고 변경</Button>
+              </div>
+            </AlertDialog.Popup>
+          </AlertDialog.Viewport>
+        </WorkspaceAlertDialogPortal>
+      </AlertDialog.Root>
     </Dialog.Root>
   );
 }
@@ -291,16 +328,18 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
   if (data.hasError) return <div className="rounded-3xl border border-border bg-card p-6" role="alert"><h2 className="text-lg font-semibold">검사성적서를 불러오지 못했어요</h2><p className="mt-2 text-muted-foreground">잠시 후 다시 시도해 주세요.</p></div>;
 
   return <div className="flex min-h-0 flex-col gap-4">
-    <form className="flex flex-col gap-3 border-y border-border bg-background p-3 @min-[768px]/workspace:flex-row @min-[768px]/workspace:items-end" onSubmit={(event) => { event.preventDefault(); loadReports({ searchField: searchField as InspectionReportQuery["searchField"], keyword: keyword.trim(), sortOrder: sortOrder as InspectionReportQuery["sortOrder"], page: 1 }); }}>
-      <label className="grid w-full gap-1.5 text-sm font-medium @min-[768px]/workspace:w-44"><span>검색 유형</span><Select aria-label="검색 유형" className="h-10" onValueChange={setSearchField} options={[{ label: "통합검색", value: "all" }, { label: "기종", value: "model" }, { label: "품번/도번", value: "drawing" }, { label: "품명", value: "itemName" }, { label: "고객명", value: "customer" }, { label: "업체명", value: "supplier" }]} value={searchField} /></label>
-      <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium"><span>검색어</span><span className="relative"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input className="h-10 w-full rounded-sm border border-input bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" maxLength={100} onChange={(event) => setKeyword(event.target.value)} placeholder="검색어를 입력해 주세요" type="search" value={keyword} /></span></label>
-      <label className="grid w-full gap-1.5 text-sm font-medium @min-[768px]/workspace:w-36"><span>정렬</span><Select aria-label="정렬" className="h-10" onValueChange={setSortOrder} options={[{ label: "최신순", value: "newest" }, { label: "오래된순", value: "oldest" }]} value={sortOrder} /></label>
-      <div className="flex items-center justify-between gap-2 @min-[768px]/workspace:ml-auto"><p className="whitespace-nowrap text-sm text-muted-foreground">검색 <strong className="text-foreground">{pageResult.total}</strong>건</p><Button disabled={isSearching} type="submit"><Search aria-hidden="true" />{isSearching ? "조회 중" : "조회"}</Button><Button onClick={openNew} type="button"><FilePlus2 aria-hidden="true" />성적서 등록</Button></div>
-    </form>
+    <SearchConditions summary={`검색 ${pageResult.total}건`}>
+      <form className="flex flex-col gap-3 p-3 @min-[768px]/workspace:flex-row @min-[768px]/workspace:items-end" onSubmit={(event) => { event.preventDefault(); loadReports({ searchField: searchField as InspectionReportQuery["searchField"], keyword: keyword.trim(), sortOrder: sortOrder as InspectionReportQuery["sortOrder"], page: 1 }); }}>
+        <label className="grid w-full gap-1.5 text-sm font-medium @min-[768px]/workspace:w-44"><span>검색 유형</span><Select aria-label="검색 유형" className="h-12" onValueChange={setSearchField} options={[{ label: "통합검색", value: "all" }, { label: "기종", value: "model" }, { label: "품번/도번", value: "drawing" }, { label: "품명", value: "itemName" }, { label: "고객명", value: "customer" }, { label: "업체명", value: "supplier" }]} value={searchField} /></label>
+        <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium"><span>검색어</span><span className="relative"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input className="h-12 w-full rounded-sm border border-input bg-background pl-10 pr-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" maxLength={100} onChange={(event) => setKeyword(event.target.value)} placeholder="검색어를 입력해 주세요" type="search" value={keyword} /></span></label>
+        <label className="grid w-full gap-1.5 text-sm font-medium @min-[768px]/workspace:w-36"><span>정렬</span><Select aria-label="정렬" className="h-12" onValueChange={setSortOrder} options={[{ label: "최신순", value: "newest" }, { label: "오래된순", value: "oldest" }]} value={sortOrder} /></label>
+        <div className="flex shrink-0 items-center gap-2 @min-[768px]/workspace:ml-auto"><Button onClick={() => { setSearchField("all"); setKeyword(""); setSortOrder("newest"); loadReports({ searchField: "all", keyword: "", sortOrder: "newest", page: 1 }); }} type="button" variant="secondary"><RotateCcw aria-hidden="true" />초기화</Button><Button disabled={isSearching} type="submit"><Search aria-hidden="true" />{isSearching ? "조회 중" : "조회"}</Button></div>
+      </form>
+    </SearchConditions>
     {pageResult.error ? <p className="text-sm text-destructive" role="alert">{pageResult.error}</p> : null}
     <div className="grid min-h-[680px] gap-4 @min-[1024px]/workspace:h-[calc(100svh-250px)] @min-[1024px]/workspace:min-h-0 @min-[1024px]/workspace:grid-cols-[340px_minmax(0,1fr)] @min-[1280px]/workspace:grid-cols-[380px_minmax(0,1fr)]">
       <section aria-labelledby="report-list-title" className="flex min-h-0 min-w-0 flex-col overflow-hidden border-y border-border">
-        <div className="flex items-center justify-between bg-muted/70 px-4 py-3"><h2 className="font-semibold" id="report-list-title">성적서 목록</h2><span className="text-xs text-muted-foreground">{currentPage} / {totalPages} 페이지</span></div>
+        <div className="flex min-h-14 items-center justify-between gap-3 bg-muted/70 px-3 py-2"><div><h2 className="font-semibold" id="report-list-title">성적서 목록</h2><span className="text-xs text-muted-foreground">{currentPage} / {totalPages} 페이지</span></div><Button onClick={openNew} size="sm" type="button"><FilePlus2 aria-hidden="true" />등록</Button></div>
         <div className="min-h-0 flex-1 overflow-y-auto">{visibleReports.length ? <div className="divide-y divide-border">{visibleReports.map((report) => { const selectedRow = selected?.seq === report.seq; return <button aria-pressed={selectedRow} className={cn("block min-h-[68px] w-full px-4 py-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", selectedRow && "bg-primary/10 hover:bg-primary/10")} key={report.seq} onClick={() => selectReport(report)} onDoubleClick={() => openEdit(report)} type="button"><span className="flex items-center justify-between gap-3"><strong className="truncate text-sm">{report.item_detail_code}</strong><span className={cn("shrink-0 text-xs tabular-nums", selectedRow ? "font-semibold text-primary" : "text-muted-foreground")}>#{report.seq}</span></span><span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"><span className="truncate">{report.model_name} · {report.item_name}</span><span aria-hidden="true">·</span><span className="shrink-0">{itemCountByReport.get(report.seq) ?? 0}항목</span></span><span className="mt-0.5 block truncate text-xs text-muted-foreground">{report.customer_name || "고객명 미입력"}</span></button>; })}</div> : <p className="px-4 py-16 text-center text-sm text-muted-foreground">{data.reports.length ? "검색 결과가 없어요." : "등록된 검사성적서가 없어요."}</p>}</div>
         <div className="flex min-h-14 items-center justify-between gap-2 border-t border-border px-3"><span className="text-xs text-muted-foreground">페이지당 최대 {pageResult.pageSize}건</span><div className="flex gap-2"><Button aria-label="이전 페이지" disabled={isSearching || currentPage <= 1} onClick={() => loadReports({ ...appliedQuery, page: currentPage - 1 })} size="sm" variant="secondary"><ChevronLeft aria-hidden="true" />이전</Button><Button aria-label="다음 페이지" disabled={isSearching || currentPage >= totalPages} onClick={() => loadReports({ ...appliedQuery, page: currentPage + 1 })} size="sm" variant="secondary">다음<ChevronRight aria-hidden="true" /></Button></div></div>
       </section>

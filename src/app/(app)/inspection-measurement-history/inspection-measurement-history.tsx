@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, Eye, RotateCcw, Search, X } from "lucide-rea
 import { FormEvent, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { SearchConditions } from "@/components/ui/search-conditions";
 import { Select } from "@/components/ui/select";
 import { WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import {
@@ -218,8 +219,9 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
         <button aria-selected={viewMode === "runs"} className={`min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring ${viewMode === "runs" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} onClick={() => changeViewMode("runs")} role="tab" type="button">검사서별</button>
         <button aria-selected={viewMode === "items"} className={`min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring ${viewMode === "items" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`} onClick={() => changeViewMode("items")} role="tab" type="button">품목별</button>
       </div>
+      <SearchConditions summary={viewMode === "runs" ? `총 ${history.total}건` : `총 ${itemGroups.total}건`}>
       <form
-        className="min-w-0 overflow-x-auto border-y border-border bg-background p-4"
+        className="min-w-0 overflow-x-auto p-4"
         onSubmit={submitFilters}
       >
         <div className="flex w-full min-w-[1040px] flex-nowrap items-end gap-3">
@@ -227,7 +229,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
             <label className="grid w-44 shrink-0 gap-1.5 text-sm font-medium" key={key}>
               <span>{label}</span>
               <input
-                className="h-10 min-w-0 rounded-sm border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-12 min-w-0 rounded-sm border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))}
                 type={type}
                 value={draft[key]}
@@ -238,6 +240,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
             <span>검색 유형</span>
             <Select
               aria-label="검색 유형"
+              className="h-12"
               onValueChange={(value) => setDraft((current) => ({ ...current, searchField: value as MeasurementHistorySearchField, keyword: value ? current.keyword : "" }))}
               options={[
                 { label: "선택", value: "" },
@@ -252,7 +255,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
           <label className="grid min-w-72 flex-1 gap-1.5 text-sm font-medium">
             <span>검색어</span>
             <input
-              className="h-10 rounded-sm border border-input bg-background px-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-50"
+              className="h-12 rounded-sm border border-input bg-background px-4 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-50"
               disabled={!draft.searchField}
               onChange={(event) => setDraft((current) => ({ ...current, keyword: event.target.value }))}
               placeholder="검색어를 입력해 주세요"
@@ -261,17 +264,18 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
             />
           </label>
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            <Button disabled={isSearching} type="submit">
-              <Search aria-hidden="true" />
-              {isSearching ? "조회 중..." : "조회"}
-            </Button>
             <Button disabled={isSearching} onClick={resetFilters} type="button" variant="secondary">
               <RotateCcw aria-hidden="true" />
               초기화
             </Button>
+            <Button disabled={isSearching} type="submit">
+              <Search aria-hidden="true" />
+              {isSearching ? "조회 중..." : "조회"}
+            </Button>
           </div>
         </div>
       </form>
+      </SearchConditions>
 
       {viewMode === "runs" ? <section aria-labelledby="measurement-history-grid-title" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-y border-border">
         <div className="flex items-center justify-between bg-muted/70 px-4 py-3">

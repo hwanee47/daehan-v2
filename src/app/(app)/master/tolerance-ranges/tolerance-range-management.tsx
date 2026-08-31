@@ -134,11 +134,13 @@ function NumberField({
 
 function RangeEditor({
   item,
+  onChanged,
   onOpenChange,
   open,
   range,
 }: {
   item: ToleranceItem;
+  onChanged?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   range: ItemToleranceRange | null;
@@ -148,8 +150,11 @@ function RangeEditor({
   const [lowerDeviation, setLowerDeviation] = useState(() => range ? String(range.lower_deviation) : "");
   const [upperDeviation, setUpperDeviation] = useState(() => range ? String(range.upper_deviation) : "");
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") {
+      onOpenChange(false);
+      onChanged?.();
+    }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -216,18 +221,23 @@ function RangeEditor({
 }
 
 function DeleteRangeDialog({
+  onChanged,
   onOpenChange,
   open,
   range,
 }: {
+  onChanged?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   range: ItemToleranceRange;
 }) {
   const [state, formAction, pending] = useActionState(deleteToleranceRange, initialActionState);
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") {
+      onOpenChange(false);
+      onChanged?.();
+    }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -260,10 +270,12 @@ function DeleteRangeDialog({
 export function ToleranceRangeManagement({
   hasFilters,
   items,
+  onDataChanged,
   ranges,
 }: {
   hasFilters: boolean;
   items: ToleranceItem[];
+  onDataChanged?: () => void;
   ranges: ItemToleranceRange[];
 }) {
   const [selectedItemSeq, setSelectedItemSeq] = useState<number | null>(items[0]?.seq ?? null);
@@ -381,6 +393,7 @@ export function ToleranceRangeManagement({
         <RangeEditor
           item={selectedItem}
           key={`range-editor-${editingRange?.seq ?? "new"}-${editorOpen}`}
+          onChanged={onDataChanged}
           onOpenChange={setEditorOpen}
           open={editorOpen}
           range={editingRange}
@@ -389,6 +402,7 @@ export function ToleranceRangeManagement({
       {deleteTarget ? (
         <DeleteRangeDialog
           key={`range-delete-${deleteTarget.seq}`}
+          onChanged={onDataChanged}
           onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
           open
           range={deleteTarget}

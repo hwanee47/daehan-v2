@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { SearchConditions } from "@/components/ui/search-conditions";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
 
 type ItemSearchParams = {
   itemCode?: string | string[];
+  itemDetailCode?: string | string[];
   itemName?: string | string[];
   modelName?: string | string[];
 };
@@ -41,6 +43,7 @@ export default async function ItemManagementPage({
   const query = await searchParams;
   const filters = {
     itemCode: getSearchValue(query.itemCode),
+    itemDetailCode: getSearchValue(query.itemDetailCode),
     itemName: getSearchValue(query.itemName),
     modelName: getSearchValue(query.modelName),
   };
@@ -60,6 +63,15 @@ export default async function ItemManagementPage({
 
   if (profile?.role !== "admin") redirect("/");
 
+  const matchingDetailsResult = filters.itemDetailCode
+    ? await supabase
+      .from("item_details")
+      .select("seq, item_seq, item_detail_code, item_detail_name, image_path, material, note")
+      .ilike("item_detail_code", `%${escapeLikePattern(filters.itemDetailCode)}%`)
+      .order("seq")
+    : null;
+  const matchingItemSeqs = [...new Set((matchingDetailsResult?.data ?? []).map((detail) => detail.item_seq))];
+
   let itemsQuery = supabase
     .from("items")
     .select("seq, item_code, item_name, image_path, model_name, note")
@@ -74,10 +86,15 @@ export default async function ItemManagementPage({
   if (filters.modelName) {
     itemsQuery = itemsQuery.ilike("model_name", `%${escapeLikePattern(filters.modelName)}%`);
   }
+  if (filters.itemDetailCode) {
+    itemsQuery = matchingItemSeqs.length ? itemsQuery.in("seq", matchingItemSeqs) : itemsQuery.eq("seq", -1);
+  }
 
   const itemsResult = await itemsQuery;
   const itemSeqs = (itemsResult.data ?? []).map((item) => item.seq);
-  const detailsResult = itemSeqs.length
+  const detailsResult = filters.itemDetailCode
+    ? { data: (matchingDetailsResult?.data ?? []).filter((detail) => itemSeqs.includes(detail.item_seq)), error: matchingDetailsResult?.error ?? null }
+    : itemSeqs.length
     ? await supabase
       .from("item_details")
       .select("seq, item_seq, item_detail_code, item_detail_name, image_path, material, note")
@@ -85,7 +102,7 @@ export default async function ItemManagementPage({
       .order("seq")
     : { data: [], error: null };
 
-  const loadError = itemsResult.error || detailsResult.error;
+  const loadError = matchingDetailsResult?.error || itemsResult.error || detailsResult.error;
   if (loadError) console.error("Failed to load item management", { code: loadError.code });
   const itemImages = await attachItemImageUrls(
     supabase,
@@ -98,8 +115,9 @@ export default async function ItemManagementPage({
       <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
         <WorkspaceBreadcrumb current="품목관리" parent="기준정보" />
         <section>
-          <form className="rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-6" method="get">
-            <div className="grid gap-4 @min-[768px]/workspace:grid-cols-2 @min-[1024px]/workspace:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+          <SearchConditions>
+          <form className="p-4 @min-[640px]/workspace:p-6" method="get">
+            <div className="grid gap-4 @min-[768px]/workspace:grid-cols-2 @min-[1280px]/workspace:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
               <div className="space-y-2">
                 <label className="text-sm font-semibold" htmlFor="search-item-code">품목코드</label>
                 <input className="h-12 w-full rounded-sm border border-input bg-background px-4 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20" defaultValue={filters.itemCode} id="search-item-code" maxLength={100} name="itemCode" placeholder="품목코드를 입력해 주세요" />
@@ -112,6 +130,10 @@ export default async function ItemManagementPage({
                 <label className="text-sm font-semibold" htmlFor="search-model-name">모델명</label>
                 <input className="h-12 w-full rounded-sm border border-input bg-background px-4 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20" defaultValue={filters.modelName} id="search-model-name" maxLength={100} name="modelName" placeholder="모델명을 입력해 주세요" />
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-semibold" htmlFor="search-item-detail-code">품목상세코드</label>
+                <input className="h-12 w-full rounded-sm border border-input bg-background px-4 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20" defaultValue={filters.itemDetailCode} id="search-item-detail-code" maxLength={100} name="itemDetailCode" placeholder="품목상세코드를 입력해 주세요" />
+              </div>
               <div className="flex items-end gap-3 @min-[768px]/workspace:col-span-2 @min-[768px]/workspace:justify-end @min-[1024px]/workspace:col-span-1 @min-[1024px]/workspace:justify-start">
                 <Link className={cn(buttonVariants({ variant: "secondary" }))} href="/master/items">
                   <RotateCcw aria-hidden="true" />초기화
@@ -120,6 +142,7 @@ export default async function ItemManagementPage({
               </div>
             </div>
           </form>
+          </SearchConditions>
 
           {loadError ? (
             <div className="mt-8 rounded-3xl border border-border bg-card p-6" role="alert">

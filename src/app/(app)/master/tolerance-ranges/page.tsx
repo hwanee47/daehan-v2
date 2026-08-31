@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { SearchConditions } from "@/components/ui/search-conditions";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -93,7 +94,8 @@ export default async function ToleranceRangeManagementPage({
       <Container className="py-5 @min-[640px]/workspace:py-6" size="full">
         <WorkspaceBreadcrumb current="오차범위관리" parent="기준정보" />
         <section>
-          <form className="rounded-3xl border border-border bg-card p-4 @min-[640px]/workspace:p-6" method="get">
+          <SearchConditions>
+          <form className="p-4 @min-[640px]/workspace:p-6" method="get">
             <div className="grid gap-4 @min-[768px]/workspace:grid-cols-2 @min-[1024px]/workspace:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
               <div className="space-y-2">
                 <label className="text-sm font-semibold" htmlFor="search-item-code">품목코드</label>
@@ -115,6 +117,7 @@ export default async function ToleranceRangeManagementPage({
               </div>
             </div>
           </form>
+          </SearchConditions>
 
           {loadError ? (
             <div className="mt-8 rounded-3xl border border-border bg-card p-6" role="alert">

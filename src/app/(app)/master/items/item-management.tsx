@@ -6,7 +6,7 @@ import type { CellKeyDownEvent, ColDef, RowClickedEvent, RowDoubleClickedEvent }
 import { AllCommunityModule } from "ag-grid-community";
 import { AgGridProvider, AgGridReact } from "ag-grid-react";
 import { ImageIcon, LoaderCircle, Maximize2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
@@ -32,6 +32,19 @@ const itemColumns: ColDef<Item>[] = [
   { field: "item_code", headerName: "품목코드", minWidth: 150, flex: 1, sort: "asc", sortIndex: 0 },
   { field: "item_name", headerName: "품목명", minWidth: 170, flex: 1.2 },
   { field: "model_name", headerName: "모델명", minWidth: 150, flex: 1 },
+  {
+    colId: "image_status",
+    headerName: "이미지",
+    minWidth: 100,
+    maxWidth: 110,
+    valueGetter: ({ data }) => data?.image_path ? "첨부" : "없음",
+    cellRenderer: ({ value }: { value: string }) => (
+      <span className={value === "첨부" ? "inline-flex items-center gap-1.5 text-primary" : "text-muted-foreground"}>
+        {value === "첨부" ? <ImageIcon aria-hidden="true" className="size-4" /> : null}
+        {value}
+      </span>
+    ),
+  },
 ];
 
 const detailColumns: ColDef<ItemDetail>[] = [
@@ -39,6 +52,19 @@ const detailColumns: ColDef<ItemDetail>[] = [
   { field: "item_detail_name", headerName: "상세명", minWidth: 170, flex: 1.2 },
   { field: "material", headerName: "소재", minWidth: 130, flex: 0.8 },
   { field: "note", headerName: "비고", minWidth: 180, flex: 1.2 },
+  {
+    colId: "image_status",
+    headerName: "이미지",
+    minWidth: 100,
+    maxWidth: 110,
+    valueGetter: ({ data }) => data?.image_path ? "첨부" : "없음",
+    cellRenderer: ({ value }: { value: string }) => (
+      <span className={value === "첨부" ? "inline-flex items-center gap-1.5 text-primary" : "text-muted-foreground"}>
+        {value === "첨부" ? <ImageIcon aria-hidden="true" className="size-4" /> : null}
+        {value}
+      </span>
+    ),
+  },
 ];
 
 const defaultColDef = { resizable: true, sortable: true };
@@ -119,12 +145,12 @@ function DialogFrame({
   );
 }
 
-function ItemEditor({ item, onOpenChange, open }: { item: Item | null; onOpenChange: (open: boolean) => void; open: boolean }) {
+function ItemEditor({ item, onChanged, onOpenChange, open }: { item: Item | null; onChanged?: () => void; onOpenChange: (open: boolean) => void; open: boolean }) {
   const [state, formAction, pending] = useActionState(saveItem, initialActionState);
   const onSaveFormKeyDown = useSaveFormShortcut();
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") { onOpenChange(false); onChanged?.(); }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <DialogFrame
@@ -165,12 +191,12 @@ function ItemEditor({ item, onOpenChange, open }: { item: Item | null; onOpenCha
   );
 }
 
-function DetailEditor({ detail, item, onOpenChange, open }: { detail: ItemDetail | null; item: Item; onOpenChange: (open: boolean) => void; open: boolean }) {
+function DetailEditor({ detail, item, onChanged, onOpenChange, open }: { detail: ItemDetail | null; item: Item; onChanged?: () => void; onOpenChange: (open: boolean) => void; open: boolean }) {
   const [state, formAction, pending] = useActionState(saveItemDetail, initialActionState);
   const onSaveFormKeyDown = useSaveFormShortcut();
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") { onOpenChange(false); onChanged?.(); }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <DialogFrame
@@ -349,14 +375,63 @@ function ImageManagerDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const previewButtonRef = useRef<HTMLButtonElement>(null);
   const previewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+
+  const selectImageFile = useCallback((nextFile: File | null, source: "clipboard" | "file") => {
+    if (!nextFile) {
+      setFile(null);
+      return;
+    }
+    if (!itemImageAccept.split(",").includes(nextFile.type)) {
+      setFile(null);
+      setError("JPEG, PNG, WebP 이미지만 첨부할 수 있어요.");
+      setMessage(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    if (nextFile.size > itemImageMaxBytes) {
+      setFile(null);
+      setError("이미지는 5MB 이하만 첨부할 수 있어요.");
+      setMessage(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setFile(nextFile);
+    setError(null);
+    setMessage(source === "clipboard" ? "클립보드 이미지를 첨부했어요. 저장 버튼을 눌러 적용해 주세요." : null);
+    if (source === "clipboard" && fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
 
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    function handlePaste(event: ClipboardEvent) {
+      if (pending) return;
+      const imageItem = Array.from(event.clipboardData?.items ?? []).find(
+        (item) => item.kind === "file" && item.type.startsWith("image/"),
+      );
+      if (!imageItem) return;
+
+      event.preventDefault();
+      const pastedFile = imageItem.getAsFile();
+      if (!pastedFile) {
+        setError("클립보드 이미지를 읽지 못했어요. 파일 선택을 이용해 주세요.");
+        setMessage(null);
+        return;
+      }
+      selectImageFile(pastedFile, "clipboard");
+    }
+
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [pending, selectImageFile]);
 
   async function uploadImage(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -391,6 +466,7 @@ function ImageManagerDialog({
       setCurrentImagePath(nextPath);
       setCurrentImageUrl(nextUrl);
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setMessage(result.message ?? "이미지를 저장했어요.");
       onImageChange(target.entity, target.seq, nextPath, nextUrl);
     } catch (uploadError) {
@@ -417,6 +493,7 @@ function ImageManagerDialog({
       setCurrentImagePath(null);
       setCurrentImageUrl(null);
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setMessage(result.message ?? "이미지를 삭제했어요.");
       onImageChange(target.entity, target.seq, null, null);
     } catch (deleteError) {
@@ -473,13 +550,15 @@ function ImageManagerDialog({
             disabled={pending}
             id="item-image-file"
             onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              setError(null);
-              setMessage(null);
+              selectImageFile(event.target.files?.[0] ?? null, "file");
             }}
+            ref={fileInputRef}
             type="file"
           />
           <p className="text-sm text-muted-foreground">JPEG, PNG, WebP · 최대 5MB</p>
+          <p className="rounded-sm border border-dashed border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+            화면을 캡처한 뒤 이 팝업에서 <kbd className="font-semibold text-foreground">Ctrl+V</kbd> 또는 <kbd className="font-semibold text-foreground">⌘V</kbd>를 누르면 바로 첨부돼요.
+          </p>
           </div>
 
           {error ? <p className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{error}</p> : null}
@@ -516,11 +595,11 @@ function ImageManagerDialog({
   );
 }
 
-function DeleteDialog({ action, itemName, onOpenChange, open, seq }: { action: ServerFormAction; itemName: string; onOpenChange: (open: boolean) => void; open: boolean; seq: number }) {
+function DeleteDialog({ action, itemName, onChanged, onOpenChange, open, seq }: { action: ServerFormAction; itemName: string; onChanged?: () => void; onOpenChange: (open: boolean) => void; open: boolean; seq: number }) {
   const [state, formAction, pending] = useActionState(action, initialActionState);
   useEffect(() => {
-    if (state.status === "success") onOpenChange(false);
-  }, [onOpenChange, state.status]);
+    if (state.status === "success") { onOpenChange(false); onChanged?.(); }
+  }, [onChanged, onOpenChange, state.status]);
 
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -545,7 +624,7 @@ function DeleteDialog({ action, itemName, onOpenChange, open, seq }: { action: S
   );
 }
 
-export function ItemManagement({ details, hasFilters, items }: { details: ItemDetail[]; hasFilters: boolean; items: Item[] }) {
+export function ItemManagement({ details, hasFilters, items, onDataChanged }: { details: ItemDetail[]; hasFilters: boolean; items: Item[]; onDataChanged?: () => void }) {
   const [selectedItemSeq, setSelectedItemSeq] = useState<number | null>(items[0]?.seq ?? null);
   const [selectedDetailSeq, setSelectedDetailSeq] = useState<number | null>(null);
   const [itemEditorOpen, setItemEditorOpen] = useState(false);
@@ -561,6 +640,14 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
   const effectiveItemSeq = items.some((item) => item.seq === selectedItemSeq) ? selectedItemSeq : (items[0]?.seq ?? null);
   const selectedItem = items.find((item) => item.seq === effectiveItemSeq) ?? null;
   const visibleDetails = useMemo(() => details.filter((detail) => detail.item_seq === effectiveItemSeq), [details, effectiveItemSeq]);
+  const gridItems = useMemo(() => items.map((item) => {
+    const override = imageOverrides[`item-${item.seq}`];
+    return { ...item, image_path: override ? override.imagePath : item.image_path };
+  }), [imageOverrides, items]);
+  const gridVisibleDetails = useMemo(() => visibleDetails.map((detail) => {
+    const override = imageOverrides[`itemDetail-${detail.seq}`];
+    return { ...detail, image_path: override ? override.imagePath : detail.image_path };
+  }), [imageOverrides, visibleDetails]);
   const selectedDetail = visibleDetails.find((detail) => detail.seq === selectedDetailSeq) ?? null;
 
   function getImageState(entity: ItemImageEntity, record: Item | ItemDetail) {
@@ -631,7 +718,7 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
         {items.length === 0 ? (
           <div className="mt-4 flex h-80 items-center justify-center rounded-2xl bg-muted px-6 text-center text-muted-foreground">{hasFilters ? "조회조건에 맞는 품목이 없어요." : "등록된 품목이 없어요. 품목을 먼저 추가해 주세요."}</div>
         ) : (
-          <div aria-label="품목 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[560px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={itemColumns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<Item>) => { if (event.data && isEnterKey(event)) openItemDetails(event.data); }} onRowClicked={selectItem} onRowDataUpdated={({ api }) => syncSelectedGridRow(api, effectiveItemSeq)} onRowDoubleClicked={(event: RowDoubleClickedEvent<Item>) => { if (event.data) openItemDetails(event.data); }} rowData={items} rowSelection={appGridSingleRowSelection} theme={appGridTheme} /></AgGridProvider></div></div>
+          <div aria-label="품목 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[560px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={itemColumns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<Item>) => { if (event.data && isEnterKey(event)) openItemDetails(event.data); }} onRowClicked={selectItem} onRowDataUpdated={({ api }) => syncSelectedGridRow(api, effectiveItemSeq)} onRowDoubleClicked={(event: RowDoubleClickedEvent<Item>) => { if (event.data) openItemDetails(event.data); }} rowData={gridItems} rowSelection={appGridSingleRowSelection} theme={appGridTheme} /></AgGridProvider></div></div>
         )}
       </section>
 
@@ -650,14 +737,14 @@ export function ItemManagement({ details, hasFilters, items }: { details: ItemDe
         ) : visibleDetails.length === 0 ? (
           <div className="mt-4 flex h-80 items-center justify-center rounded-2xl bg-muted px-6 text-center text-muted-foreground">등록된 품목상세가 없어요.</div>
         ) : (
-          <div aria-label="품목상세 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[720px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={detailColumns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<ItemDetail>) => { if (event.data && isEnterKey(event)) openItemDetailDetails(event.data); }} onRowClicked={(event: RowClickedEvent<ItemDetail>) => event.data && setSelectedDetailSeq(event.data.seq)} onRowDataUpdated={({ api }) => syncSelectedGridRow(api, selectedDetailSeq)} onRowDoubleClicked={(event: RowDoubleClickedEvent<ItemDetail>) => { if (event.data) openItemDetailDetails(event.data); }} rowData={visibleDetails} rowSelection={appGridSingleRowSelection} theme={appGridTheme} /></AgGridProvider></div></div>
+          <div aria-label="품목상세 목록" className="mt-4 overflow-x-auto"><div className="h-[420px] min-w-[720px]"><AgGridProvider modules={modules}><AgGridReact columnDefs={detailColumns} defaultColDef={defaultColDef} getRowId={({ data }) => String(data.seq)} onCellKeyDown={(event: CellKeyDownEvent<ItemDetail>) => { if (event.data && isEnterKey(event)) openItemDetailDetails(event.data); }} onRowClicked={(event: RowClickedEvent<ItemDetail>) => event.data && setSelectedDetailSeq(event.data.seq)} onRowDataUpdated={({ api }) => syncSelectedGridRow(api, selectedDetailSeq)} onRowDoubleClicked={(event: RowDoubleClickedEvent<ItemDetail>) => { if (event.data) openItemDetailDetails(event.data); }} rowData={gridVisibleDetails} rowSelection={appGridSingleRowSelection} theme={appGridTheme} /></AgGridProvider></div></div>
         )}
       </section>
 
-      <ItemEditor item={editingItem} key={`item-editor-${editingItem?.seq ?? "new"}-${itemEditorOpen}`} onOpenChange={setItemEditorOpen} open={itemEditorOpen} />
-      {selectedItem ? <DetailEditor detail={editingDetail} item={selectedItem} key={`detail-editor-${editingDetail?.seq ?? "new"}-${detailEditorOpen}`} onOpenChange={setDetailEditorOpen} open={detailEditorOpen} /> : null}
-      {itemDeleteTarget ? <DeleteDialog action={deleteItem} itemName={`품목 “${itemDeleteTarget.item_name}”`} key={`item-delete-${itemDeleteTarget.seq}`} onOpenChange={(open) => { if (!open) setItemDeleteTarget(null); }} open seq={itemDeleteTarget.seq} /> : null}
-      {detailDeleteTarget ? <DeleteDialog action={deleteItemDetail} itemName={`품목상세 “${detailDeleteTarget.item_detail_name}”`} key={`detail-delete-${detailDeleteTarget.seq}`} onOpenChange={(open) => { if (!open) setDetailDeleteTarget(null); }} open seq={detailDeleteTarget.seq} /> : null}
+      <ItemEditor item={editingItem} key={`item-editor-${editingItem?.seq ?? "new"}-${itemEditorOpen}`} onChanged={onDataChanged} onOpenChange={setItemEditorOpen} open={itemEditorOpen} />
+      {selectedItem ? <DetailEditor detail={editingDetail} item={selectedItem} key={`detail-editor-${editingDetail?.seq ?? "new"}-${detailEditorOpen}`} onChanged={onDataChanged} onOpenChange={setDetailEditorOpen} open={detailEditorOpen} /> : null}
+      {itemDeleteTarget ? <DeleteDialog action={deleteItem} itemName={`품목 “${itemDeleteTarget.item_name}”`} key={`item-delete-${itemDeleteTarget.seq}`} onChanged={onDataChanged} onOpenChange={(open) => { if (!open) setItemDeleteTarget(null); }} open seq={itemDeleteTarget.seq} /> : null}
+      {detailDeleteTarget ? <DeleteDialog action={deleteItemDetail} itemName={`품목상세 “${detailDeleteTarget.item_detail_name}”`} key={`detail-delete-${detailDeleteTarget.seq}`} onChanged={onDataChanged} onOpenChange={(open) => { if (!open) setDetailDeleteTarget(null); }} open seq={detailDeleteTarget.seq} /> : null}
       {detailViewTarget ? <RecordDetailDialog onClose={() => setDetailViewTarget(null)} target={detailViewTarget} /> : null}
       {imageTarget ? (
         <ImageManagerDialog
