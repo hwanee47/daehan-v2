@@ -12,7 +12,7 @@ const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
 const codeManagementPath = "/master/codes";
 const reportPageSize = 50;
-const reportColumns = "seq, model_name, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
+const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
 const reportSearchColumns = { model: "model_name", drawing: "item_detail_code", itemName: "item_name", customer: "customer_name", supplier: "supplier_name" } as const;
 
 function safeSearchTerm(value: string) {

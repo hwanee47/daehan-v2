@@ -54,7 +54,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const historyRun = viewMode === "history" ? data.measurementRuns.find((run) => run.seq === selectedRunSeq) ?? null : null;
   const isHistory = viewMode === "history";
   const report = historyRun ? {
-    seq: historyRun.inspection_report_seq, model_name: historyRun.model_name, item_code: historyRun.item_code, item_name: historyRun.item_name ?? "", item_detail_seq: historyRun.item_detail_seq,
+    seq: historyRun.inspection_report_seq, model_name: historyRun.model_name, item_seq: historyRun.item_seq, item_code: historyRun.item_code, item_name: historyRun.item_name ?? "", item_detail_seq: historyRun.item_detail_seq,
     item_detail_code: historyRun.item_detail_code, item_detail_name: historyRun.item_detail_name ?? historyRun.item_detail_code, material: historyRun.material, image_path: historyRun.image_path, image_url: historyRun.image_url, customer_name: historyRun.customer_name, supplier_name: historyRun.supplier_name,
     delivery_quantity: historyRun.delivery_quantity, sample_count: historyRun.sample_count, product_type_code_seq: historyRun.product_type_code_seq,
     product_type_code: historyRun.product_type_code, product_type_name: historyRun.product_type_name,

@@ -24,3 +24,21 @@ export type MeasurementHistoryDetail = {
   items: InspectionMeasurementRunItem[];
   error: string | null;
 };
+
+export type MeasurementItemGroup = {
+  item_seq: number;
+  item_code: string;
+  item_name: string;
+  model_name: string;
+  item_detail_count: number;
+  run_count: number;
+  latest_created_at: string;
+};
+
+export type MeasurementItemGroupPage = {
+  rows: MeasurementItemGroup[];
+  total: number;
+  page: number;
+  pageSize: number;
+  error: string | null;
+};

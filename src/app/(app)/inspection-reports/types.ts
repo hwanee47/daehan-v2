@@ -1,6 +1,7 @@
 export type InspectionReport = {
   seq: number;
   model_name: string;
+  item_seq: number;
   item_code: string;
   item_name: string;
   item_detail_seq: number;
@@ -55,6 +56,7 @@ export type InspectionMeasurementRun = {
   run_no: number;
   event_type: "save" | "print" | "migration";
   model_name: string;
+  item_seq: number;
   item_code: string;
   item_detail_seq: number;
   item_detail_code: string;
