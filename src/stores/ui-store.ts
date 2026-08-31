@@ -11,10 +11,13 @@ type UiState = {
   splitRatio: number;
   openTabHrefs: AppTabHref[];
   tabLimitMessage: string | null;
+  measurementTargetSeq: number | null;
+  measurementTargetRequestId: number;
   openSidebar: () => void;
   closeSidebar: () => void;
   toggleSidebar: () => void;
   openTab: (href: AppTabHref) => void;
+  openMeasurementReport: (reportSeq: number) => void;
   activateTab: (href: AppTabHref) => void;
   closeTab: (href: AppTabHref) => void;
   closeAllTabs: () => void;
@@ -43,6 +46,8 @@ export const useUiStore = create<UiState>()(
       splitRatio: defaultSplitRatio,
       openTabHrefs: [],
       tabLimitMessage: null,
+      measurementTargetSeq: null,
+      measurementTargetRequestId: 0,
       openSidebar: () => set({ isSidebarOpen: true }),
       closeSidebar: () => set({ isSidebarOpen: false }),
       toggleSidebar: () =>
@@ -68,6 +73,26 @@ export const useUiStore = create<UiState>()(
             isWorkspaceVisible: true,
             openTabHrefs: [...state.openTabHrefs, href],
             tabLimitMessage: null,
+          };
+        }),
+      openMeasurementReport: (reportSeq) =>
+        set((state) => {
+          const href = "/inspection-measurements" as const;
+          const isOpen = state.openTabHrefs.includes(href);
+
+          if (!isOpen && state.openTabHrefs.length >= maxOpenTabs) {
+            return {
+              tabLimitMessage: `탭은 최대 ${maxOpenTabs}개까지 열 수 있어요.`,
+            };
+          }
+
+          return {
+            activeTabHref: href,
+            isWorkspaceVisible: true,
+            openTabHrefs: isOpen ? state.openTabHrefs : [...state.openTabHrefs, href],
+            tabLimitMessage: null,
+            measurementTargetSeq: reportSeq,
+            measurementTargetRequestId: state.measurementTargetRequestId + 1,
           };
         }),
       activateTab: (href) =>

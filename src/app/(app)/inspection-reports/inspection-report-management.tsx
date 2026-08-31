@@ -2,7 +2,7 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
-import { ChevronLeft, ChevronRight, Expand, FilePlus2, MapPin, Pencil, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Expand, FilePlus2, MapPin, Pencil, Plus, RotateCcw, ScanLine, Search, Trash2, X } from "lucide-react";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
 
 import { deleteInspectionReport, getInspectionToleranceRanges, saveInspectionReport, searchInspectionReports } from "./actions";
 import { InspectionMarkerImage, type InspectionMarker } from "./inspection-marker-image";
@@ -273,6 +274,7 @@ function DeleteReportDialog({ onDeleted, onOpenChange, open, report }: { onDelet
 }
 
 export function InspectionReportManagement({ data, initialPage }: { data: InspectionReportData; initialPage: InspectionReportPage }) {
+  const openMeasurementReport = useUiStore((state) => state.openMeasurementReport);
   const [pageResult, setPageResult] = useState(initialPage);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(initialPage.rows[0]?.seq ?? null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -344,7 +346,7 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
         <div className="flex min-h-14 items-center justify-between gap-2 border-t border-border px-3"><span className="text-xs text-muted-foreground">페이지당 최대 {pageResult.pageSize}건</span><div className="flex gap-2"><Button aria-label="이전 페이지" disabled={isSearching || currentPage <= 1} onClick={() => loadReports({ ...appliedQuery, page: currentPage - 1 })} size="sm" variant="secondary"><ChevronLeft aria-hidden="true" />이전</Button><Button aria-label="다음 페이지" disabled={isSearching || currentPage >= totalPages} onClick={() => loadReports({ ...appliedQuery, page: currentPage + 1 })} size="sm" variant="secondary">다음<ChevronRight aria-hidden="true" /></Button></div></div>
       </section>
       <section aria-labelledby="report-detail-title" className="flex min-h-0 min-w-0 flex-col overflow-hidden border-y border-border">
-        <div className="flex min-h-16 items-center justify-between gap-3 bg-muted/70 px-4 py-2"><div className="min-w-0"><h2 className="truncate font-semibold" id="report-detail-title">{selected ? `${selected.item_detail_code} · ${selectedItem?.item_name || selected.model_name}` : "성적서 정보"}</h2>{selected ? <p className="mt-0.5 truncate text-xs text-muted-foreground">#{selected.seq} · {selected.model_name}{selected.customer_name ? ` · ${selected.customer_name}` : ""}</p> : null}</div>{selected ? <div className="flex shrink-0 gap-2"><Button onClick={() => openEdit()} size="sm" variant="secondary"><Pencil aria-hidden="true" />수정</Button><Button onClick={() => setDeleteOpen(true)} size="sm" variant="secondary"><Trash2 aria-hidden="true" />삭제</Button></div> : null}</div>
+        <div className="flex min-h-16 items-center justify-between gap-3 bg-muted/70 px-4 py-2"><div className="min-w-0"><h2 className="truncate font-semibold" id="report-detail-title">{selected ? `${selected.item_detail_code} · ${selectedItem?.item_name || selected.model_name}` : "성적서 정보"}</h2>{selected ? <p className="mt-0.5 truncate text-xs text-muted-foreground">#{selected.seq} · {selected.model_name}{selected.customer_name ? ` · ${selected.customer_name}` : ""}</p> : null}</div>{selected ? <div className="flex shrink-0 flex-wrap justify-end gap-2"><Button onClick={() => openMeasurementReport(selected.seq)} size="sm"><ScanLine aria-hidden="true" />결과 입력</Button><Button onClick={() => openEdit()} size="sm" variant="secondary"><Pencil aria-hidden="true" />수정</Button><Button onClick={() => setDeleteOpen(true)} size="sm" variant="secondary"><Trash2 aria-hidden="true" />삭제</Button></div> : null}</div>
         {selected ? <><div aria-label="성적서 상세 구분" className="flex shrink-0 border-b border-border px-4" role="tablist"><button aria-selected={detailTab === "basic"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", detailTab === "basic" ? "border-primary text-primary" : "border-transparent text-muted-foreground")} onClick={() => setDetailTab("basic")} role="tab" type="button">기본정보</button><button aria-selected={detailTab === "inspection"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", detailTab === "inspection" ? "border-primary text-primary" : "border-transparent text-muted-foreground")} onClick={() => setDetailTab("inspection")} role="tab" type="button">도면·검사항목 <span className="ml-1 text-xs">{selectedItems.length}</span></button></div><div className="min-h-0 flex-1 overflow-y-auto p-4 @min-[640px]/workspace:p-5">
           {detailTab === "basic" ? <dl className="grid gap-x-6 gap-y-5 @min-[640px]/workspace:grid-cols-2 @min-[1280px]/workspace:grid-cols-3">{[
             ["기종", selected.model_name], ["품목코드", selected.item_code], ["품목상세코드", selected.item_detail_code], ["품명", selected.item_name], ["품목상세명", selected.item_detail_name], ["재질", selected.material ?? ""],

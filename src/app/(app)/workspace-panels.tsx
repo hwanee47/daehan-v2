@@ -8,6 +8,7 @@ import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { Button } from "@/components/ui/button";
 import { SearchConditions } from "@/components/ui/search-conditions";
 import type { AppTabHref } from "@/lib/app-tabs";
+import { useUiStore } from "@/stores/ui-store";
 
 import { InspectionReportManagement } from "./inspection-reports/inspection-report-management";
 import { InspectionMeasurementSheet } from "./inspection-measurements/inspection-measurement-sheet";
@@ -90,8 +91,19 @@ function InspectionReportsPanel({ isVisible }: { isVisible: boolean }) {
 
 function InspectionMeasurementsPanel({ isVisible }: { isVisible: boolean }) {
   const load = useCallback(() => loadInspectionMeasurementsWorkspace(), []);
-  const { result, loadError } = useVisibleLoad(isVisible, load);
-  return <PanelFrame current="결과 입력" parent="검사성적서">{loadError ? <LoadState message={loadError} /> : !result ? <LoadState message="측정결과 입력 정보를 불러오는 중이에요" pending /> : <InspectionMeasurementSheet data={result} showModeTabs={false} />}</PanelFrame>;
+  const { result, loadError, setResult } = useVisibleLoad(isVisible, load);
+  const measurementTargetSeq = useUiStore((state) => state.measurementTargetSeq);
+  const measurementTargetRequestId = useUiStore((state) => state.measurementTargetRequestId);
+  const handledTargetRequestId = useRef(0);
+  useEffect(() => {
+    if (!isVisible || measurementTargetRequestId === 0 || handledTargetRequestId.current === measurementTargetRequestId) return;
+    handledTargetRequestId.current = measurementTargetRequestId;
+    if (!result) return;
+    void load().then(setResult).catch((error: unknown) => {
+      console.error("Failed to refresh measurement target", { message: error instanceof Error ? error.message : "Unknown error" });
+    });
+  }, [isVisible, load, measurementTargetRequestId, result, setResult]);
+  return <PanelFrame current="결과 입력" parent="검사성적서">{loadError ? <LoadState message={loadError} /> : !result ? <LoadState message="측정결과 입력 정보를 불러오는 중이에요" pending /> : <InspectionMeasurementSheet data={result} initialReportSeq={measurementTargetSeq ?? undefined} selectionRequestId={measurementTargetRequestId} showModeTabs={false} />}</PanelFrame>;
 }
 
 function InspectionHistoryPanel({ isVisible }: { isVisible: boolean }) {

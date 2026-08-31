@@ -47,7 +47,7 @@ function MarkerFullscreenDialog({ label, markers, onClose, url }: { label: strin
   return <Dialog.Root open onOpenChange={(open) => { if (!open) onClose(); }}><WorkspaceDialogPortal><Dialog.Backdrop className="fixed inset-0 z-[70] bg-foreground/90 backdrop-blur-sm" /><Dialog.Viewport className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6"><Dialog.Popup className="relative size-full outline-none"><Dialog.Title className="sr-only">{label} 이미지 전체 화면 보기</Dialog.Title><Dialog.Description className="sr-only">검사항목 순번이 표시된 이미지를 화면에 맞춰 보여줘요.</Dialog.Description><InspectionMarkerImage alt={`${label} 도면 또는 제품 이미지`} markers={markers} url={url} /><Dialog.Close aria-label="전체 화면 닫기" className="absolute right-1 top-1 z-20 inline-flex size-11 items-center justify-center rounded-full bg-background text-foreground shadow-lg sm:right-3 sm:top-3"><X aria-hidden="true" /></Dialog.Close></Dialog.Popup></Dialog.Viewport></WorkspaceDialogPortal></Dialog.Root>;
 }
 
-export function InspectionMeasurementSheet({ data, fillContainer = false, floatingPrintButton = false, initialReportSeq, initialRunSeq = null, initialViewMode = "input", showHistorySelector = true, showModeTabs = true, showReportList = true }: { data: InspectionReportData; fillContainer?: boolean; floatingPrintButton?: boolean; initialReportSeq?: number; initialRunSeq?: number | null; initialViewMode?: "input" | "history"; showHistorySelector?: boolean; showModeTabs?: boolean; showReportList?: boolean }) {
+export function InspectionMeasurementSheet({ data, fillContainer = false, floatingPrintButton = false, initialReportSeq, initialRunSeq = null, initialViewMode = "input", selectionRequestId = 0, showHistorySelector = true, showModeTabs = true, showReportList = true }: { data: InspectionReportData; fillContainer?: boolean; floatingPrintButton?: boolean; initialReportSeq?: number; initialRunSeq?: number | null; initialViewMode?: "input" | "history"; selectionRequestId?: number; showHistorySelector?: boolean; showModeTabs?: boolean; showReportList?: boolean }) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"input" | "history">(initialViewMode);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(initialReportSeq ?? data.reports[0]?.seq ?? null);
@@ -56,6 +56,16 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearchPending, startSearchTransition] = useTransition();
   const [selectedRunSeq, setSelectedRunSeq] = useState<number | null>(initialRunSeq);
+  const [handledSelectionRequestId, setHandledSelectionRequestId] = useState(selectionRequestId);
+  if (selectionRequestId !== handledSelectionRequestId && initialReportSeq && data.reports.some((report) => report.seq === initialReportSeq)) {
+    setHandledSelectionRequestId(selectionRequestId);
+    setViewMode("input");
+    setVisibleReports(data.reports);
+    setSearchKeyword("");
+    setSearchError(null);
+    setSelectedSeq(initialReportSeq);
+    setSelectedRunSeq(null);
+  }
   const currentReport = visibleReports.find((item) => item.seq === selectedSeq) ?? null;
   const reportRuns = useMemo(() => data.measurementRuns.filter((run) => run.inspection_report_seq === selectedSeq), [data.measurementRuns, selectedSeq]);
   const historyRun = viewMode === "history" ? data.measurementRuns.find((run) => run.seq === selectedRunSeq) ?? null : null;

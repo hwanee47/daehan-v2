@@ -20,11 +20,11 @@ export const appGridSingleRowSelection = {
   mode: "singleRow",
 } as const;
 
-export function syncSelectedGridRow(api: GridApi, selectedSeq: number | null) {
-  if (selectedSeq === null) {
+export function syncSelectedGridRow(api: GridApi, selectedId: number | string | null) {
+  if (selectedId === null) {
     api.deselectAll();
     return;
   }
 
-  api.getRowNode(String(selectedSeq))?.setSelected(true, true);
+  api.getRowNode(String(selectedId))?.setSelected(true, true);
 }

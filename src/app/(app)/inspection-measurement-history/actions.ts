@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createSignedFileUrls } from "@/lib/supabase/storage";
 
 import type { InspectionMeasurementRun, InspectionMeasurementRunItem } from "../inspection-reports/types";
-import type { MeasurementHistoryDetail, MeasurementHistoryPage, MeasurementHistoryQuery, MeasurementItemGroup, MeasurementItemGroupPage } from "./types";
+import type { MeasurementHistoryDetail, MeasurementHistoryPage, MeasurementHistoryQuery, MeasurementModelGroup, MeasurementModelGroupPage, MeasurementModelReport, MeasurementModelReportPage } from "./types";
 
 const pageSize = 50;
 const searchColumns = { model: "model_name", drawing: "item_detail_code", itemName: "item_name", customer: "customer_name" } as const;
@@ -52,7 +52,7 @@ export async function searchMeasurementHistory(query: MeasurementHistoryQuery): 
   };
 }
 
-export async function searchMeasurementItemGroups(query: MeasurementHistoryQuery): Promise<MeasurementItemGroupPage> {
+export async function searchMeasurementModelGroups(query: MeasurementHistoryQuery): Promise<MeasurementModelGroupPage> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const page = Number.isInteger(query.page) && query.page > 0 && query.page <= 1_000_000 ? query.page : 1;
@@ -60,7 +60,7 @@ export async function searchMeasurementItemGroups(query: MeasurementHistoryQuery
 
   const keyword = query.keyword.trim().slice(0, 100);
   const from = (page - 1) * pageSize;
-  const { data, error } = await supabase.rpc("search_inspection_measurement_item_groups", {
+  const { data, error } = await supabase.rpc("search_inspection_measurement_model_groups_v2", {
     p_date_from: validDate(query.dateFrom) ? dayBoundary(query.dateFrom) : null,
     p_date_to: validDate(query.dateTo) ? dayBoundary(query.dateTo, true) : null,
     p_search_field: query.searchField,
@@ -69,17 +69,14 @@ export async function searchMeasurementItemGroups(query: MeasurementHistoryQuery
     p_limit: pageSize,
   });
   if (error) {
-    console.error("Failed to search measurement item groups", { code: error.code });
-    return { rows: [], total: 0, page, pageSize, error: "품목별 측정 이력을 조회하지 못했어요." };
+    console.error("Failed to search measurement model groups", { code: error.code });
+    return { rows: [], total: 0, page, pageSize, error: "기종별 측정 이력을 조회하지 못했어요." };
   }
-  const rawRows = (data ?? []) as Array<MeasurementItemGroup & { total_count: number }>;
+  const rawRows = (data ?? []) as Array<MeasurementModelGroup & { total_count: number }>;
   return {
     rows: rawRows.map((row) => ({
-      item_seq: row.item_seq,
-      item_code: row.item_code,
-      item_name: row.item_name,
       model_name: row.model_name,
-      item_detail_count: Number(row.item_detail_count),
+      report_count: Number(row.report_count),
       run_count: Number(row.run_count),
       latest_created_at: row.latest_created_at,
     })),
@@ -90,16 +87,38 @@ export async function searchMeasurementItemGroups(query: MeasurementHistoryQuery
   };
 }
 
-export async function searchMeasurementItemRuns(itemSeq: number, page: number): Promise<MeasurementHistoryPage> {
+export async function searchMeasurementModelReports(modelName: string, page: number): Promise<MeasurementModelReportPage> {
   const safePage = Number.isInteger(page) && page > 0 && page <= 1_000_000 ? page : 1;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !Number.isSafeInteger(itemSeq) || itemSeq <= 0) return { rows: [], total: 0, page: safePage, pageSize, error: "조회할 품목을 확인해 주세요." };
+  const safeModelName = modelName.trim().slice(0, 100);
+  if (!user || !safeModelName) return { rows: [], total: 0, page: safePage, pageSize, error: "조회할 기종을 확인해 주세요." };
   const from = (safePage - 1) * pageSize;
-  const { data, error, count } = await supabase.from("inspection_measurement_runs").select(runColumns, { count: "exact" }).eq("item_seq", itemSeq).order("item_detail_code").order("created_at", { ascending: false }).order("seq", { ascending: false }).range(from, from + pageSize - 1);
+  const { data, error } = await supabase.rpc("search_inspection_measurement_model_reports", { p_model_name: safeModelName, p_offset: from, p_limit: pageSize });
   if (error) {
-    console.error("Failed to search item measurement runs", { code: error.code });
-    return { rows: [], total: 0, page: safePage, pageSize, error: "품목의 검사서를 조회하지 못했어요." };
+    console.error("Failed to search model reports", { code: error.code });
+    return { rows: [], total: 0, page: safePage, pageSize, error: "기종의 검사서 목록을 조회하지 못했어요." };
+  }
+  const rawRows = (data ?? []) as Array<MeasurementModelReport & { total_count: number }>;
+  return {
+    rows: rawRows.map((row) => ({ ...row, inspection_report_seq: Number(row.inspection_report_seq), history_count: Number(row.history_count) })),
+    total: Number(rawRows[0]?.total_count ?? 0),
+    page: safePage,
+    pageSize,
+    error: null,
+  };
+}
+
+export async function searchMeasurementReportRuns(reportSeq: number, page: number): Promise<MeasurementHistoryPage> {
+  const safePage = Number.isInteger(page) && page > 0 && page <= 1_000_000 ? page : 1;
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user || !Number.isSafeInteger(reportSeq) || reportSeq <= 0) return { rows: [], total: 0, page: safePage, pageSize, error: "조회할 검사서를 확인해 주세요." };
+  const from = (safePage - 1) * pageSize;
+  const { data, error, count } = await supabase.from("inspection_measurement_runs").select(runColumns, { count: "exact" }).eq("inspection_report_seq", reportSeq).order("created_at", { ascending: false }).order("seq", { ascending: false }).range(from, from + pageSize - 1);
+  if (error) {
+    console.error("Failed to search report measurement runs", { code: error.code });
+    return { rows: [], total: 0, page: safePage, pageSize, error: "검사서의 측정 이력을 조회하지 못했어요." };
   }
   return { rows: ((data ?? []) as unknown as Omit<InspectionMeasurementRun, "image_url">[]).map((run) => ({ ...run, image_url: null })), total: count ?? 0, page: safePage, pageSize, error: null };
 }

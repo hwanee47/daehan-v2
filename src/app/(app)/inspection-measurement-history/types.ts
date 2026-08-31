@@ -25,18 +25,33 @@ export type MeasurementHistoryDetail = {
   error: string | null;
 };
 
-export type MeasurementItemGroup = {
-  item_seq: number;
-  item_code: string;
-  item_name: string;
+export type MeasurementModelGroup = {
   model_name: string;
-  item_detail_count: number;
+  report_count: number;
   run_count: number;
   latest_created_at: string;
 };
 
-export type MeasurementItemGroupPage = {
-  rows: MeasurementItemGroup[];
+export type MeasurementModelGroupPage = {
+  rows: MeasurementModelGroup[];
+  total: number;
+  page: number;
+  pageSize: number;
+  error: string | null;
+};
+
+export type MeasurementModelReport = {
+  inspection_report_seq: number;
+  item_code: string;
+  item_detail_code: string;
+  item_detail_name: string;
+  customer_name: string | null;
+  history_count: number;
+  latest_created_at: string;
+};
+
+export type MeasurementModelReportPage = {
+  rows: MeasurementModelReport[];
   total: number;
   page: number;
   pageSize: number;
