@@ -57,7 +57,7 @@ function FullscreenImage({ label, markers, onClose, url }: { label: string; mark
           <Dialog.Popup className="relative size-full outline-none">
             <Dialog.Title className="sr-only">{label} 이미지 전체 화면 보기</Dialog.Title>
             <Dialog.Description className="sr-only">이미지를 원본 비율로 화면에 맞춰 표시해요.</Dialog.Description>
-            <InspectionMarkerImage alt={`${label} 이미지`} markers={markers} url={url} />
+            <InspectionMarkerImage alt={`${label} 이미지`} markerSize="fixed" markers={markers} url={url} />
             <Dialog.Close aria-label="전체 화면 닫기" className="absolute right-1 top-1 inline-flex size-11 items-center justify-center rounded-full bg-background text-foreground shadow-lg sm:right-3 sm:top-3"><X aria-hidden="true" /></Dialog.Close>
           </Dialog.Popup>
         </Dialog.Viewport>

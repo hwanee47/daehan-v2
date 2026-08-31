@@ -16,6 +16,7 @@ export function InspectionMarkerImage({
   alt,
   className,
   editable = false,
+  markerSize = "responsive",
   markers,
   onPlace,
   url,
@@ -24,6 +25,7 @@ export function InspectionMarkerImage({
   alt: string;
   className?: string;
   editable?: boolean;
+  markerSize?: "fixed" | "responsive";
   markers: InspectionMarker[];
   onPlace?: (x: number, y: number) => void;
   priority?: boolean;
@@ -70,9 +72,14 @@ export function InspectionMarkerImage({
     onPlace(Number(x.toFixed(6)), Number(y.toFixed(6)));
   }
 
-  const displayScale = naturalSize.width && box.width ? box.width / naturalSize.width : 0;
-  const markerRadius = displayScale ? 16 / displayScale : Math.min(naturalSize.width, naturalSize.height) * 0.025;
-  const markerFontSize = displayScale ? 14 / displayScale : Math.min(naturalSize.width, naturalSize.height) * 0.022;
+  const displayScale = naturalSize.width && box.width ? box.width / naturalSize.width : 1;
+  const displayBaseSize = Math.min(box.width, box.height);
+  const usesFixedMarkerSize = editable || markerSize === "fixed";
+  const markerDisplayRadius = usesFixedMarkerSize ? 16 : Math.min(26, Math.max(7, displayBaseSize * 0.03));
+  const markerDisplayFontSize = usesFixedMarkerSize ? 14 : Math.min(22, Math.max(7, displayBaseSize * 0.026));
+  const markerRadius = markerDisplayRadius / displayScale;
+  const markerFontSize = markerDisplayFontSize / displayScale;
+  const markerStrokeWidth = (usesFixedMarkerSize ? 1.5 : Math.max(1, markerDisplayRadius * 0.1)) / displayScale;
 
   return (
     <div
@@ -88,7 +95,7 @@ export function InspectionMarkerImage({
         {markers.map((marker) => {
           const x = marker.x * naturalSize.width;
           const y = marker.y * naturalSize.height;
-          return <g aria-label={`${marker.label}번 검사 위치`} key={marker.label} role="img"><title>{marker.label}번 검사 위치</title><circle cx={x} cy={y} fill="none" r={markerRadius} stroke="currentColor" strokeWidth={Math.max(1.5 / (displayScale || 1), markerRadius * 0.1)} /><text dominantBaseline="central" fill="currentColor" fontSize={markerFontSize} fontWeight="700" textAnchor="middle" x={x} y={y}>{marker.label}</text></g>;
+          return <g aria-label={`${marker.label}번 검사 위치`} key={marker.label} role="img"><title>{marker.label}번 검사 위치</title><circle cx={x} cy={y} fill="none" r={markerRadius} stroke="currentColor" strokeWidth={markerStrokeWidth} /><text dominantBaseline="central" fill="currentColor" fontSize={markerFontSize} fontWeight="700" textAnchor="middle" x={x} y={y}>{marker.label}</text></g>;
         })}
       </svg> : null}
     </div>
