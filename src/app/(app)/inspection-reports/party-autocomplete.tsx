@@ -34,7 +34,6 @@ export function PartyAutocomplete({
   options: InspectionCodeOption[];
 }) {
   const [inputValue, setInputValue] = useState(defaultValue);
-  const [highlightedOption, setHighlightedOption] = useState<InspectionCodeOption>();
   const [open, setOpen] = useState(false);
   const availableOptions = useMemo(() => {
     const trimmedInputValue = inputValue.trim();
@@ -51,14 +50,13 @@ export function PartyAutocomplete({
 
   return (
     <Autocomplete.Root
-      autoHighlight
+      autoHighlight="always"
       filter={matches}
       itemToStringValue={(option) => option.code_name}
       items={availableOptions}
       limit={100}
       mode="list"
       name={name}
-      onItemHighlighted={setHighlightedOption}
       onOpenChange={setOpen}
       onValueChange={(nextValue, details) => {
         if (
@@ -80,13 +78,6 @@ export function PartyAutocomplete({
           autoComplete="off"
           className="h-full min-w-0 flex-1 bg-transparent px-3 pr-10 text-sm font-normal outline-none placeholder:text-muted-foreground"
           maxLength={100}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && open && highlightedOption) {
-              event.preventDefault();
-              setInputValue(highlightedOption.code_name);
-              setOpen(false);
-            }
-          }}
           placeholder={`${ariaLabel} 코드 또는 코드명을 검색해 주세요`}
         />
         <Autocomplete.Clear

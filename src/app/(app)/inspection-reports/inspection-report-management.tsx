@@ -67,8 +67,11 @@ function FullscreenImage({ label, markers, onClose, url }: { label: string; mark
 function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: InspectionReportData; onOpenChange: (open: boolean) => void; onSaved: (reportSeq?: number) => void; open: boolean; report: InspectionReport | null }) {
   const [state, formAction, pending] = useActionState(saveInspectionReport, initialActionState);
   const onSaveFormKeyDown = useSaveFormShortcut();
+  const initialProductTypeCodeSeq = report
+    ? report.product_type_code_seq
+    : data.codes.find((code) => code.group_code === "U0002" && code.code_name.trim() === "초도품")?.seq ?? null;
   const [itemDetailSeq, setItemDetailSeq] = useState(report ? String(report.item_detail_seq) : "");
-  const [productTypeCodeSeq, setProductTypeCodeSeq] = useState(report?.product_type_code_seq ? String(report.product_type_code_seq) : "");
+  const [productTypeCodeSeq, setProductTypeCodeSeq] = useState(initialProductTypeCodeSeq ? String(initialProductTypeCodeSeq) : "");
   const [sampleCount, setSampleCount] = useState(report?.sample_count ? String(report.sample_count) : "");
   const [fullscreen, setFullscreen] = useState(false);
   const [markerDialogOpen, setMarkerDialogOpen] = useState(false);
