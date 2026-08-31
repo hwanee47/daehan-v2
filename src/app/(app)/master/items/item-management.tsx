@@ -5,7 +5,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import type { CellKeyDownEvent, ColDef, RowClickedEvent, RowDoubleClickedEvent } from "ag-grid-community";
 import { AllCommunityModule } from "ag-grid-community";
 import { AgGridProvider, AgGridReact } from "ag-grid-react";
-import { ImageIcon, LoaderCircle, Maximize2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { Download, ImageIcon, LoaderCircle, Maximize2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -89,11 +89,35 @@ type ImageResponse = {
 
 type DetailViewTarget = {
   description: string;
+  entity: ItemImageEntity;
   fields: Array<{ label: string; value: string | null }>;
+  imagePath: string | null;
   imageUrl: string | null;
   label: string;
+  seq: number;
   title: string;
 };
+
+async function downloadItemImage(entity: ItemImageEntity, seq: number) {
+  const response = await fetch(`/api/item-images/download?entity=${encodeURIComponent(entity)}&seq=${seq}`);
+  if (!response.ok) {
+    const result = await response.json().catch(() => null) as { message?: string } | null;
+    throw new Error(result?.message ?? "이미지를 다운로드하지 못했어요.");
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const fileName = encodedName ? decodeURIComponent(encodedName) : "item-image";
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
 
 function ActionMessage({ state }: { state: ItemActionState }) {
   if (!state.message) return null;
@@ -284,6 +308,8 @@ function RecordDetailDialog({
   target: DetailViewTarget;
 }) {
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadPending, setDownloadPending] = useState(false);
   const imageButtonRef = useRef<HTMLButtonElement>(null);
 
   function closeFullscreen() {
@@ -335,7 +361,9 @@ function RecordDetailDialog({
                 </dl>
               </div>
 
-              <div className="mt-6 flex justify-end">
+              {downloadError ? <p className="mt-4 rounded-sm bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">{downloadError}</p> : null}
+              <div className="mt-6 flex justify-end gap-3">
+                {target.imagePath ? <Button disabled={downloadPending} onClick={() => { setDownloadPending(true); setDownloadError(null); void downloadItemImage(target.entity, target.seq).catch((error: unknown) => setDownloadError(error instanceof Error ? error.message : "이미지를 다운로드하지 못했어요.")).finally(() => setDownloadPending(false)); }} type="button" variant="secondary">{downloadPending ? <LoaderCircle aria-hidden="true" className="animate-spin" /> : <Download aria-hidden="true" />}다운로드</Button> : null}
                 <Dialog.Close className="inline-flex h-12 items-center justify-center rounded-xl bg-secondary px-5 font-semibold">닫기</Dialog.Close>
               </div>
             </Dialog.Popup>
@@ -503,6 +531,20 @@ function ImageManagerDialog({
     }
   }
 
+  async function downloadImage() {
+    setPending(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await downloadItemImage(target.entity, target.seq);
+      setMessage("이미지 다운로드를 시작했어요.");
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : "이미지를 다운로드하지 못했어요.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   const displayedImageUrl = previewUrl ?? currentImageUrl;
 
   function closeFullscreen() {
@@ -565,14 +607,7 @@ function ImageManagerDialog({
           {message ? <p className="rounded-xl bg-accent px-3 py-2 text-sm text-primary" role="status">{message}</p> : null}
 
           <div className="flex flex-wrap justify-between gap-3 pt-1">
-          <Button
-            disabled={pending || !currentImagePath}
-            onClick={deleteImage}
-            type="button"
-            variant="destructive"
-          >
-            <Trash2 aria-hidden="true" />이미지 삭제
-          </Button>
+          <div className="flex gap-2"><Button disabled={pending || !currentImagePath} onClick={downloadImage} type="button" variant="secondary"><Download aria-hidden="true" />다운로드</Button><Button disabled={pending || !currentImagePath} onClick={deleteImage} type="button" variant="destructive"><Trash2 aria-hidden="true" />이미지 삭제</Button></div>
           <div className="flex gap-3">
             <Dialog.Close className="inline-flex h-12 items-center justify-center rounded-xl bg-secondary px-5 font-semibold" disabled={pending}>닫기</Dialog.Close>
             <Button disabled={pending || !file} type="submit">
@@ -662,24 +697,30 @@ export function ItemManagement({ details, hasFilters, items, onDataChanged }: { 
   }
 
   function openItemDetails(item: Item) {
+    const imageState = getImageState("item", item);
     setDetailViewTarget({
       description: "품목의 기본 정보와 대표 이미지예요.",
+      entity: "item",
       fields: [
         { label: "품목코드", value: item.item_code },
         { label: "품목명", value: item.item_name },
         { label: "모델명", value: item.model_name },
         { label: "비고", value: item.note },
       ],
-      imageUrl: getImageState("item", item).imageUrl,
+      imagePath: imageState.imagePath,
+      imageUrl: imageState.imageUrl,
       label: item.item_name,
+      seq: item.seq,
       title: "품목 정보",
     });
   }
 
   function openItemDetailDetails(detail: ItemDetail) {
     const parentItem = items.find((item) => item.seq === detail.item_seq);
+    const imageState = getImageState("itemDetail", detail);
     setDetailViewTarget({
       description: "품목상세의 기본 정보와 대표 이미지예요.",
+      entity: "itemDetail",
       fields: [
         { label: "연결 품목", value: parentItem ? `${parentItem.item_code} (${parentItem.item_name})` : null },
         { label: "상세코드", value: detail.item_detail_code },
@@ -687,8 +728,10 @@ export function ItemManagement({ details, hasFilters, items, onDataChanged }: { 
         { label: "소재", value: detail.material },
         { label: "비고", value: detail.note },
       ],
-      imageUrl: getImageState("itemDetail", detail).imageUrl,
+      imagePath: imageState.imagePath,
+      imageUrl: imageState.imageUrl,
       label: detail.item_detail_name,
+      seq: detail.seq,
       title: "품목상세 정보",
     });
   }
