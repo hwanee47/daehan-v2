@@ -329,8 +329,24 @@ export async function saveInspectionMeasurements(
   const productTypeCodeText = text(formData, "productTypeCodeSeq");
   const productTypeCodeSeq = optionalPositiveInteger(productTypeCodeText);
   const eventType = "save" as const;
-  const rows = parseItems(text(formData, "items"));
+  const parsedRows = parseItems(text(formData, "items"));
+  const material = text(formData, "material");
+  const hardness = text(formData, "hardness");
+  const heatTreatment = text(formData, "heatTreatment");
+  const rows = parsedRows?.filter((row) => row.seq || row.nominalDimension.trim() || row.toleranceMin.trim() || row.toleranceMax.trim() || row.results.some((result) => result.trim()) || row.note.trim());
   if (!reportSeq || !rows || productTypeCodeText && !productTypeCodeSeq) return mutationError("측정할 성적서와 제품구분, 결과를 확인해 주세요.");
+  if (material.length > 100 || hardness.length > 100 || heatTreatment.length > 100) return mutationError("재질, 경도와 열처리는 100자 이하로 입력해 주세요.");
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row.seq) continue;
+    const min = numeric(row.toleranceMin);
+    const max = numeric(row.toleranceMax);
+    if (!row.nominalDimension.trim() || row.nominalDimension.trim().length > 100 || min === null || max === null) {
+      return mutationError(`${index + 1}번 신규 항목의 기준치수와 공차를 모두 입력해 주세요.`);
+    }
+    if (min > max) return mutationError(`${index + 1}번 신규 항목의 공차 하한은 상한보다 작거나 같아야 해요.`);
+  }
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -347,28 +363,35 @@ export async function saveInspectionMeasurements(
   }
 
   const payload = rows.map((row, index) => {
-    if (!row.seq) return null;
     const values = results[index];
     return {
-      item_seq: row.seq,
+      item_seq: row.seq ?? null,
+      nominal_dimension: row.nominalDimension.trim(),
+      tolerance_min: row.toleranceMin.trim(),
+      tolerance_max: row.toleranceMax.trim(),
       result_1: values[0], result_2: values[1], result_3: values[2], result_4: values[3], result_5: values[4],
       result_6: values[5], result_7: values[6], result_8: values[7], result_9: values[8], result_10: values[9],
       note: row.note.trim() || null,
     };
   });
-  if (payload.some((row) => row === null)) return mutationError("검사항목을 다시 불러와 주세요.");
-  const { data: runSeq, error } = await supabase.rpc("save_inspection_measurement_run", {
+  const { data: saveResult, error } = await supabase.rpc("save_inspection_measurement_entry", {
     p_inspection_report_seq: reportSeq,
     p_product_type_code_seq: productTypeCodeSeq,
     p_event_type: eventType,
+    p_material: material,
+    p_hardness: hardness,
+    p_heat_treatment: heatTreatment,
     p_rows: payload,
   });
-  if (error || typeof runSeq !== "number") {
+  const result = saveResult as { run_seq?: unknown; item_seqs?: unknown } | null;
+  const runSeq = typeof result?.run_seq === "number" ? result.run_seq : null;
+  const itemSeqs = Array.isArray(result?.item_seqs) && result.item_seqs.every((seq) => typeof seq === "number") ? result.item_seqs : null;
+  if (error || runSeq === null || !itemSeqs || itemSeqs.length !== rows.length) {
     console.error("Failed to save measurement run", { code: error?.code });
-    return mutationError(error?.code === "23514" ? "제품구분 코드가 올바르지 않아요." : "측정결과 이력을 저장하지 못했어요. 다시 시도해 주세요.");
+    return mutationError(error?.code === "23514" ? "제품구분 또는 신규 검사항목을 다시 확인해 주세요." : "측정결과 이력을 저장하지 못했어요. 다시 시도해 주세요.");
   }
   revalidatePath(inspectionReportsPath);
   revalidatePath(inspectionMeasurementsPath);
   revalidatePath("/", "layout");
-  return { status: "success", message: "측정결과와 이력을 저장했어요.", reportSeq, runSeq, eventType };
+  return { status: "success", message: "성적서 정보와 측정결과를 저장했어요.", reportSeq, runSeq, itemSeqs, eventType };
 }

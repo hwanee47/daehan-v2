@@ -139,6 +139,7 @@ export type InspectionReportActionState = {
   message?: string;
   reportSeq?: number;
   runSeq?: number;
+  itemSeqs?: number[];
   eventType?: "save" | "print";
 };
 

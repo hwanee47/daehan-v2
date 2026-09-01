@@ -167,9 +167,32 @@
   width: 80px;
 }
 
+.inspection-marker-print-overlay {
+  display: none;
+}
+
 .inspection-print-sheet tbody td:nth-child(2),
 .inspection-print-sheet tbody td:nth-child(3) {
   font-size: 12px;
+}
+
+/* Tailwind의 방향별 border utility 조합에서도 성적서 내부 점선을 확실히 유지한다. */
+.inspection-print-sheet [class~="border-dashed"] {
+  border-style: dotted !important;
+}
+
+.inspection-print-sheet [class~="border-b-dashed"] {
+  border-bottom-style: dotted !important;
+}
+
+.inspection-print-sheet > :not(.inspection-print-header) b,
+.inspection-print-sheet > :not(.inspection-print-header) th,
+.inspection-print-sheet > :not(.inspection-print-header) .font-semibold {
+  font-weight: 400;
+}
+
+.inspection-print-sheet > :not(.inspection-print-header) .inspection-judgment-options {
+  font-weight: 600;
 }
 
 @media print {
@@ -184,14 +207,33 @@
 
   body:has(.inspection-print-sheet) .inspection-print-sheet {
     position: fixed;
-    inset: 0 auto auto 0;
+    inset: auto auto auto auto;
+    top: 50%;
+    left: 50%;
     box-sizing: border-box;
-    width: 100%;
+    width: calc(100% - 19mm);
     min-width: 0;
     margin: 0;
     padding: 7mm;
     box-shadow: none;
     print-color-adjust: exact;
+    transform: translate(-50%, -50%);
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet table col:nth-child(1) {
+    width: 30px;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet table col:nth-child(2) {
+    width: 56px;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet table col:nth-child(3) {
+    width: 54px;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet table col:nth-child(14) {
+    width: 60px;
   }
 
   body:has(.inspection-print-sheet) .inspection-print-datetime {
@@ -208,6 +250,14 @@
 
   body:has(.inspection-print-sheet) .inspection-print-sheet svg {
     overflow: hidden !important;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-marker-has-print-overlay .inspection-marker-screen-overlay {
+    display: none;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-marker-print-overlay {
+    display: block;
   }
 
   body:has(.inspection-print-sheet) .inspection-print-sheet tbody td:nth-child(2),

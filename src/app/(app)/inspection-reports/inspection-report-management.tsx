@@ -222,8 +222,8 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
                   <Field label="납품수량"><input className={inputClass} defaultValue={report?.delivery_quantity ?? ""} min={1} name="deliveryQuantity" type="number" /></Field>
                   <Field label="시료수"><input className={inputClass} max={10} min={1} name="sampleCount" type="number" value={sampleCount} onChange={(event) => setSampleCount(event.target.value)} /></Field>
                   <Field label="제품구분"><Select aria-label="제품구분" className="h-11" name="productTypeCodeSeq" onValueChange={setProductTypeCodeSeq} options={[{ label: "선택 안 함", value: "" }, ...productTypes.map((code) => ({ label: code.code_name, value: String(code.seq) }))]} value={productTypeCodeSeq} /></Field>
-                  <Field label="경도"><input className={inputClass} defaultValue={report?.hardness ?? ""} maxLength={100} name="hardness" /></Field>
-                  <Field label="열처리"><input className={inputClass} defaultValue={report?.heat_treatment ?? ""} maxLength={100} name="heatTreatment" /></Field>
+                  <Field label="경도"><input className={inputClass} defaultValue={report ? report.hardness ?? "" : "HrC 30~35"} maxLength={100} name="hardness" /></Field>
+                  <Field label="열처리"><input className={inputClass} defaultValue={report ? report.heat_treatment ?? "" : "Q.T/질화"} maxLength={100} name="heatTreatment" /></Field>
                 </div>
               </section>
 
