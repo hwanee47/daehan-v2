@@ -81,6 +81,10 @@ function numeric(value: string) {
   return Number.isFinite(number) ? number : null;
 }
 
+function toleranceText(value: string) {
+  return value.replace(/[\u200B-\u200D\u2060\uFEFF]/g, "").trim();
+}
+
 function optionalNumeric(value: string) {
   return value.trim() ? numeric(value.trim()) : null;
 }
@@ -124,8 +128,8 @@ export async function saveInspectionReport(
 
   const normalizedItems = items.map((item) => ({
     nominal: item.nominalDimension.trim(),
-    min: numeric(item.toleranceMin),
-    max: numeric(item.toleranceMax),
+    min: toleranceText(item.toleranceMin),
+    max: toleranceText(item.toleranceMax),
     markerXRatio: item.markerXRatio,
     markerYRatio: item.markerYRatio,
   }));
@@ -133,9 +137,11 @@ export async function saveInspectionReport(
     const item = normalizedItems[index];
     if (!item.nominal) return mutationError(`${index + 1}번 검사항목의 기준치수를 입력해 주세요.`);
     if (item.nominal.length > 100) return mutationError(`${index + 1}번 검사항목의 기준치수는 100자 이하로 입력해 주세요.`);
-    if (item.min === null) return mutationError(`${index + 1}번 검사항목의 공차 min을 숫자로 입력해 주세요.`);
-    if (item.max === null) return mutationError(`${index + 1}번 검사항목의 공차 max를 숫자로 입력해 주세요.`);
-    if (item.min > item.max) return mutationError(`${index + 1}번 검사항목의 공차 min은 공차 max보다 작거나 같아야 해요.`);
+    if (!item.min || !item.max) return mutationError(`${index + 1}번 검사항목의 공차 min과 max를 입력해 주세요.`);
+    if (item.min.length > 100 || item.max.length > 100) return mutationError(`${index + 1}번 검사항목의 공차는 100자 이하로 입력해 주세요.`);
+    const minNumber = numeric(item.min);
+    const maxNumber = numeric(item.max);
+    if (minNumber !== null && maxNumber !== null && minNumber > maxNumber) return mutationError(`${index + 1}번 검사항목의 공차 min은 공차 max보다 작거나 같아야 해요.`);
   }
 
   const supabase = await createClient();
@@ -146,7 +152,7 @@ export async function saveInspectionReport(
   const detail = selectedDetail as unknown as { seq: number; items: { model_name: string | null } } | null;
   if (detailError || !detail?.items.model_name) return mutationError("기종이 등록된 품목상세를 선택해 주세요.");
 
-  const directCodeNames = [...new Set(items.filter((item) => item.isDirectCode).map((item) => item.nominalDimension.trim()))];
+  const directCodeNames = [...new Set(items.filter((item) => item.isDirectCode).map((item) => item.nominalDimension.trim()).filter(Boolean))];
   if (directCodeNames.length > 0) {
     const { error: codeError } = await supabase.rpc("ensure_u0003_codes", { p_code_names: directCodeNames });
     if (codeError) {
@@ -181,7 +187,7 @@ export async function saveInspectionReport(
     }
     const structureChanged = (existingItems?.length ?? 0) !== normalizedItems.length || normalizedItems.some((item, index) => {
       const existing = existingItems?.[index];
-      return !existing || existing.nominal_dimension.trim() !== item.nominal || Number(existing.tolerance_min) !== item.min || Number(existing.tolerance_max) !== item.max;
+      return !existing || existing.nominal_dimension.trim() !== item.nominal || (existing.tolerance_min ?? "").trim() !== item.min || (existing.tolerance_max ?? "").trim() !== item.max;
     });
     const hasResults = (existingMeasurements ?? []).some((measurement) =>
       Array.from({ length: 10 }, (_, index) => measurement[`result_${index + 1}` as keyof typeof measurement]).some((value) => value !== null)
@@ -255,8 +261,8 @@ export async function saveInspectionReport(
     inspection_report_seq: reportSeq as number,
     sort_order: index + 1,
     nominal_dimension: item.nominal,
-    tolerance_min: item.min as number,
-    tolerance_max: item.max as number,
+    tolerance_min: item.min,
+    tolerance_max: item.max,
     marker_x_ratio: item.markerXRatio,
     marker_y_ratio: item.markerYRatio,
   }))).select("seq, sort_order");
@@ -328,24 +334,27 @@ export async function saveInspectionMeasurements(
   const reportSeq = positiveInteger(text(formData, "reportSeq"));
   const productTypeCodeText = text(formData, "productTypeCodeSeq");
   const productTypeCodeSeq = optionalPositiveInteger(productTypeCodeText);
-  const eventType = "save" as const;
+  const eventTypeText = text(formData, "eventType");
+  const eventType = eventTypeText === "save" || eventTypeText === "print" ? eventTypeText : null;
   const parsedRows = parseItems(text(formData, "items"));
   const material = text(formData, "material");
   const hardness = text(formData, "hardness");
   const heatTreatment = text(formData, "heatTreatment");
-  const rows = parsedRows?.filter((row) => row.seq || row.nominalDimension.trim() || row.toleranceMin.trim() || row.toleranceMax.trim() || row.results.some((result) => result.trim()) || row.note.trim());
-  if (!reportSeq || !rows || productTypeCodeText && !productTypeCodeSeq) return mutationError("측정할 성적서와 제품구분, 결과를 확인해 주세요.");
+  const rows = parsedRows?.filter((row) => row.seq || row.nominalDimension.trim() || toleranceText(row.toleranceMin) || toleranceText(row.toleranceMax) || row.results.some((result) => result.trim()) || row.note.trim());
+  if (!reportSeq || !rows || !eventType || productTypeCodeText && !productTypeCodeSeq) return mutationError("측정할 성적서와 제품구분, 결과를 확인해 주세요.");
   if (material.length > 100 || hardness.length > 100 || heatTreatment.length > 100) return mutationError("재질, 경도와 열처리는 100자 이하로 입력해 주세요.");
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
     if (row.seq) continue;
-    const min = numeric(row.toleranceMin);
-    const max = numeric(row.toleranceMax);
-    if (!row.nominalDimension.trim() || row.nominalDimension.trim().length > 100 || min === null || max === null) {
-      return mutationError(`${index + 1}번 신규 항목의 기준치수와 공차를 모두 입력해 주세요.`);
-    }
-    if (min > max) return mutationError(`${index + 1}번 신규 항목의 공차 하한은 상한보다 작거나 같아야 해요.`);
+    const nominal = row.nominalDimension.trim();
+    const minText = toleranceText(row.toleranceMin);
+    const maxText = toleranceText(row.toleranceMax);
+    const min = minText ? numeric(minText) : null;
+    const max = maxText ? numeric(maxText) : null;
+    if (nominal.length > 100) return mutationError(`${index + 1}번 신규 항목의 기준치수는 100자 이하로 입력해 주세요.`);
+    if (minText.length > 100 || maxText.length > 100) return mutationError(`${index + 1}번 신규 항목의 공차는 100자 이하로 입력해 주세요.`);
+    if (min !== null && max !== null && min > max) return mutationError(`${index + 1}번 신규 항목의 공차 하한은 상한보다 작거나 같아야 해요.`);
   }
 
   const supabase = await createClient();
@@ -367,8 +376,8 @@ export async function saveInspectionMeasurements(
     return {
       item_seq: row.seq ?? null,
       nominal_dimension: row.nominalDimension.trim(),
-      tolerance_min: row.toleranceMin.trim(),
-      tolerance_max: row.toleranceMax.trim(),
+      tolerance_min: toleranceText(row.toleranceMin),
+      tolerance_max: toleranceText(row.toleranceMax),
       result_1: values[0], result_2: values[1], result_3: values[2], result_4: values[3], result_5: values[4],
       result_6: values[5], result_7: values[6], result_8: values[7], result_9: values[8], result_10: values[9],
       note: row.note.trim() || null,
@@ -393,5 +402,5 @@ export async function saveInspectionMeasurements(
   revalidatePath(inspectionReportsPath);
   revalidatePath(inspectionMeasurementsPath);
   revalidatePath("/", "layout");
-  return { status: "success", message: "성적서 정보와 측정결과를 저장했어요.", reportSeq, runSeq, itemSeqs, eventType };
+  return { status: "success", message: eventType === "print" ? "인쇄 전 변경 내용을 저장했어요." : "성적서 정보와 측정결과를 저장했어요.", reportSeq, runSeq, itemSeqs, eventType };
 }

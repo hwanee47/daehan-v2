@@ -26,9 +26,9 @@ export type InspectionReportItem = {
   seq: number;
   sort_order: number;
   inspection_report_seq: number;
-  nominal_dimension: string;
-  tolerance_min: number;
-  tolerance_max: number;
+  nominal_dimension: string | null;
+  tolerance_min: string | null;
+  tolerance_max: string | null;
   marker_x_ratio: number | null;
   marker_y_ratio: number | null;
 };
@@ -81,9 +81,9 @@ export type InspectionMeasurementRunItem = Omit<InspectionReportMeasurement, "in
   measurement_run_seq: number;
   source_report_item_seq: number | null;
   sort_order: number;
-  nominal_dimension: string;
-  tolerance_min: number;
-  tolerance_max: number;
+  nominal_dimension: string | null;
+  tolerance_min: string | null;
+  tolerance_max: string | null;
   marker_x_ratio: number | null;
   marker_y_ratio: number | null;
 };

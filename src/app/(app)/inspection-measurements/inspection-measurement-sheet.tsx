@@ -2,12 +2,11 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
-import { Clock3, Expand, Plus, Printer, RotateCcw, Save, Search, X } from "lucide-react";
+import { CheckCircle2, Clock3, Expand, FileSearch2, Plus, Printer, RotateCcw, Save, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { SearchConditions } from "@/components/ui/search-conditions";
 import { Select } from "@/components/ui/select";
 import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
@@ -22,6 +21,36 @@ const initialState: InspectionReportActionState = { status: "idle" };
 
 function blankMeasurementItem(): InspectionReportDraftItem {
   return { nominalDimension: "", toleranceMin: "", toleranceMax: "", results: Array(10).fill(""), note: "", markerXRatio: null, markerYRatio: null };
+}
+
+function measurementSnapshot(rows: InspectionReportDraftItem[], fields: { material: string; hardness: string; heatTreatment: string }, productTypeCodeSeq: number | null) {
+  return JSON.stringify({
+    fields: { material: fields.material.trim(), hardness: fields.hardness.trim(), heatTreatment: fields.heatTreatment.trim() },
+    productTypeCodeSeq,
+    rows: rows
+      .filter((row) => row.seq || row.nominalDimension.trim() || row.toleranceMin.trim() || row.toleranceMax.trim() || row.results.some((result) => result.trim()) || row.note.trim())
+      .map((row) => ({
+        nominalDimension: row.nominalDimension.trim(),
+        toleranceMin: row.toleranceMin.trim(),
+        toleranceMax: row.toleranceMax.trim(),
+        results: row.results.map((result) => result.trim()),
+        note: row.note.trim(),
+      })),
+  });
+}
+
+function submittedMeasurementSnapshot(formData: FormData) {
+  try {
+    const rows = JSON.parse(String(formData.get("items") ?? "[]")) as InspectionReportDraftItem[];
+    const productTypeValue = String(formData.get("productTypeCodeSeq") ?? "");
+    return measurementSnapshot(rows, {
+      material: String(formData.get("material") ?? ""),
+      hardness: String(formData.get("hardness") ?? ""),
+      heatTreatment: String(formData.get("heatTreatment") ?? ""),
+    }, productTypeValue ? Number(productTypeValue) : null);
+  } catch {
+    return null;
+  }
 }
 
 function valueText(value: number | string | null | undefined) { return value === null || value === undefined ? "" : String(value); }
@@ -54,8 +83,11 @@ function MarkerFullscreenDialog({ label, markers, onClose, url }: { label: strin
 export function InspectionMeasurementSheet({ data, fillContainer = false, floatingPrintButton = false, initialReportSeq, initialRunSeq = null, initialViewMode = "input", selectionRequestId = 0, showHistorySelector = true, showModeTabs = true, showReportList = true }: { data: InspectionReportData; fillContainer?: boolean; floatingPrintButton?: boolean; initialReportSeq?: number; initialRunSeq?: number | null; initialViewMode?: "input" | "history"; selectionRequestId?: number; showHistorySelector?: boolean; showModeTabs?: boolean; showReportList?: boolean }) {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"input" | "history">(initialViewMode);
-  const [selectedSeq, setSelectedSeq] = useState<number | null>(initialReportSeq ?? data.reports[0]?.seq ?? null);
-  const [visibleReports, setVisibleReports] = useState(data.reports);
+  const [selectedSeq, setSelectedSeq] = useState<number | null>(initialReportSeq ?? null);
+  const [pickerReports, setPickerReports] = useState(data.reports);
+  const [reportPickerOpen, setReportPickerOpen] = useState(false);
+  const [loadFeedback, setLoadFeedback] = useState<{ phase: "loading" | "success"; message: string } | null>(initialReportSeq ? { phase: "success", message: "검사성적서를 불러왔어요." } : null);
+  const loadFeedbackTimerRef = useRef<number | null>(null);
   const [searchKeyword, setSearchKeyword] = useState("");
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearchPending, startSearchTransition] = useTransition();
@@ -64,13 +96,14 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   if (selectionRequestId !== handledSelectionRequestId && initialReportSeq && data.reports.some((report) => report.seq === initialReportSeq)) {
     setHandledSelectionRequestId(selectionRequestId);
     setViewMode("input");
-    setVisibleReports(data.reports);
+    setPickerReports(data.reports);
     setSearchKeyword("");
     setSearchError(null);
     setSelectedSeq(initialReportSeq);
     setSelectedRunSeq(null);
+    setLoadFeedback({ phase: "success", message: "검사성적서를 불러왔어요." });
   }
-  const currentReport = visibleReports.find((item) => item.seq === selectedSeq) ?? null;
+  const currentReport = data.reports.find((item) => item.seq === selectedSeq) ?? pickerReports.find((item) => item.seq === selectedSeq) ?? null;
   const reportRuns = useMemo(() => data.measurementRuns.filter((run) => run.inspection_report_seq === selectedSeq), [data.measurementRuns, selectedSeq]);
   const historyRun = viewMode === "history" ? data.measurementRuns.find((run) => run.seq === selectedRunSeq) ?? null : null;
   const isHistory = viewMode === "history";
@@ -113,17 +146,24 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const [overwriteConfirmOpen, setOverwriteConfirmOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [baselineByReport, setBaselineByReport] = useState<Record<number, string>>({});
   const [isRecentHistoryPending, startRecentHistoryTransition] = useTransition();
   const [state, action, pending] = useActionState(async (previousState: InspectionReportActionState, formData: FormData) => {
+    const submittedSnapshot = submittedMeasurementSnapshot(formData);
     const result = await saveInspectionMeasurements(previousState, formData);
     if (result.status === "success" && result.reportSeq) {
       const savedReportSeq = result.reportSeq;
+      if (submittedSnapshot) setBaselineByReport((current) => ({ ...current, [savedReportSeq]: submittedSnapshot }));
       setRowsByReport((current) => {
         const savedRows = current[savedReportSeq];
         if (!savedRows) return current;
         const normalizedRows = savedRows.filter((row) => row.seq || row.nominalDimension.trim() || row.toleranceMin.trim() || row.toleranceMax.trim() || row.results.some((value) => value.trim()) || row.note.trim());
-        return { ...current, [savedReportSeq]: normalizedRows.map((row, index) => ({ ...row, seq: result.itemSeqs?.[index] ?? row.seq, results: Array(10).fill(""), note: "" })) };
+        return { ...current, [savedReportSeq]: normalizedRows.map((row, index) => ({ ...row, seq: result.itemSeqs?.[index] ?? row.seq })) };
       });
+      if (result.eventType === "print") {
+        preparePrint();
+        window.setTimeout(openPrintDialog, 0);
+      }
     }
     return result;
   }, initialState);
@@ -133,6 +173,9 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const productCodes = data.codes.filter((code) => code.group_code === "U0002");
   const productName = report?.product_type_name ?? "";
   const markers = reportItems.flatMap((reportItem) => reportItem.marker_x_ratio === null || reportItem.marker_y_ratio === null ? [] : [{ x: reportItem.marker_x_ratio, y: reportItem.marker_y_ratio, label: reportItem.sort_order }]);
+  const currentSnapshot = report && !isHistory ? measurementSnapshot(rows, reportFields, selectedProductTypeSeq) : "";
+  const initialSnapshot = report && !isHistory ? measurementSnapshot(initialRows, { material: report.material ?? "", hardness: report.hardness ?? "", heatTreatment: report.heat_treatment ?? "" }, report.product_type_code_seq) : "";
+  const hasPrintChanges = Boolean(report && !isHistory && currentSnapshot !== (baselineByReport[report.seq] ?? initialSnapshot));
 
   function setRows(next: InspectionReportDraftItem[]) { if (report) setRowsByReport((current) => ({ ...current, [report.seq]: next })); }
   function updateRow(rowIndex: number, update: Partial<InspectionReportDraftItem>) {
@@ -149,18 +192,49 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     if (!report || isHistory) return;
     setReportFieldsByReport((current) => ({ ...current, [report.seq]: { ...reportFields, [key]: value } }));
   }
+  function finishLoadFeedback(message: string) {
+    if (loadFeedbackTimerRef.current !== null) window.clearTimeout(loadFeedbackTimerRef.current);
+    loadFeedbackTimerRef.current = window.setTimeout(() => setLoadFeedback({ phase: "success", message }), 250);
+  }
   function selectReport(reportSeq: number) {
+    setLoadFeedback({ phase: "loading", message: "검사성적서를 불러오는 중이에요." });
+    setRowsByReport((current) => {
+      if (!(reportSeq in current)) return current;
+      const next = { ...current };
+      delete next[reportSeq];
+      return next;
+    });
+    setBaselineByReport((current) => {
+      if (!(reportSeq in current)) return current;
+      const next = { ...current };
+      delete next[reportSeq];
+      return next;
+    });
+    setReportFieldsByReport((current) => {
+      if (!(reportSeq in current)) return current;
+      const next = { ...current };
+      delete next[reportSeq];
+      return next;
+    });
+    setProductTypeByReport((current) => {
+      if (!(reportSeq in current)) return current;
+      const next = { ...current };
+      delete next[reportSeq];
+      return next;
+    });
     setSelectedSeq(reportSeq);
     setSelectedRunSeq(viewMode === "history" ? data.measurementRuns.find((run) => run.inspection_report_seq === reportSeq)?.seq ?? null : null);
+    setReportPickerOpen(false);
+    finishLoadFeedback("검사성적서를 불러왔어요.");
   }
   function isCompatibleHistory(run: RecentMeasurementRun) {
     return run.items.length === reportItems.length && reportItems.every((currentItem, index) => {
       const historyItem = run.items[index];
       return historyItem
         && historyItem.sort_order === currentItem.sort_order
-        && historyItem.nominal_dimension.trim() === String(currentItem.nominal_dimension).trim()
-        && Number(historyItem.tolerance_min) === Number(currentItem.tolerance_min)
-        && Number(historyItem.tolerance_max) === Number(currentItem.tolerance_max);
+        && String(historyItem.nominal_dimension ?? "").trim() === String(currentItem.nominal_dimension ?? "").trim()
+        && String(historyItem.tolerance_min ?? "").trim() === String(currentItem.tolerance_min ?? "").trim()
+        && String(historyItem.tolerance_max ?? "").trim() === String(currentItem.tolerance_max ?? "").trim();
     });
   }
   function applyHistory(run: RecentMeasurementRun) {
@@ -177,6 +251,8 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     setPendingHistoryRun(null);
     setOverwriteConfirmOpen(false);
     setRecentHistoryOpen(false);
+    setLoadFeedback({ phase: "loading", message: `${run.runNo}회차 측정이력을 불러오는 중이에요.` });
+    finishLoadFeedback(`${run.runNo}회차 측정이력을 불러왔어요.`);
   }
   function requestHistoryApply(run: RecentMeasurementRun) {
     const hasInput = rows.some((row) => row.results.some((result) => result.trim() !== "") || row.note.trim() !== "");
@@ -210,8 +286,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
       if (result.error) return;
       const originalBySeq = new Map(data.reports.map((report) => [report.seq, report]));
       const nextReports = result.rows.map((report) => ({ ...report, image_url: originalBySeq.get(report.seq)?.image_url ?? null }));
-      setVisibleReports(nextReports);
-      setSelectedSeq((current) => nextReports.some((report) => report.seq === current) ? current : nextReports[0]?.seq ?? null);
+      setPickerReports(nextReports);
     });
   }
   function selectViewMode(mode: "input" | "history") {
@@ -228,6 +303,18 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     window.addEventListener("afterprint", restoreTitle, { once: true });
     window.setTimeout(() => window.print(), 0);
   }
+  function requestPrint() {
+    setActionMenuOpen(false);
+    if (!hasPrintChanges) {
+      preparePrint();
+      window.setTimeout(openPrintDialog, 0);
+      return;
+    }
+    const form = document.getElementById("inspection-measurement-form") as HTMLFormElement | null;
+    const submitter = form?.querySelector<HTMLButtonElement>('[data-print-submit="true"]');
+    if (!form || !submitter || submitter.disabled) return;
+    form.requestSubmit(submitter);
+  }
 
   useEffect(() => {
     if (state.status !== "success" || !state.runSeq || handledRunSeq.current === state.runSeq) return;
@@ -235,34 +322,43 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     router.refresh();
   }, [router, state]);
 
+  useEffect(() => {
+    if (loadFeedback?.phase !== "success") return;
+    const timeout = window.setTimeout(() => setLoadFeedback(null), 1_400);
+    return () => window.clearTimeout(timeout);
+  }, [loadFeedback]);
+
+  useEffect(() => () => {
+    if (loadFeedbackTimerRef.current !== null) window.clearTimeout(loadFeedbackTimerRef.current);
+  }, []);
+
   if (data.hasError) return <div className="border-y border-border p-10 text-center" role="alert"><h2 className="font-semibold">검사성적서를 불러오지 못했어요</h2><p className="mt-2 text-sm text-muted-foreground">잠시 후 다시 시도해 주세요.</p></div>;
 
-  return <div className={cn("flex min-w-0 flex-col", fillContainer && "h-full min-h-0")}>
+  return <div className={cn("relative flex min-w-0 flex-col", fillContainer && "h-full min-h-0")}>
+    {loadFeedback?.phase === "loading" ? <div aria-live="polite" className="fixed inset-0 z-[100] bg-foreground/30 backdrop-blur-[3px]" role="status"><span className="sr-only">{loadFeedback.message}</span></div> : null}
     {showModeTabs ? <div aria-label="측정 관리 화면" className="inspection-print-hide mb-4 flex gap-1 border-b border-border" role="tablist">
       <button aria-controls="measurement-input-panel" aria-selected={viewMode === "input"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", viewMode === "input" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")} id="measurement-input-tab" onClick={() => selectViewMode("input")} onKeyDown={(event) => { if (event.key === "ArrowRight") { event.preventDefault(); selectViewMode("history"); } }} role="tab" type="button">결과 입력</button>
       <button aria-controls="measurement-history-panel" aria-selected={viewMode === "history"} className={cn("min-h-11 border-b-2 px-4 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring", viewMode === "history" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")} id="measurement-history-tab" onClick={() => selectViewMode("history")} onKeyDown={(event) => { if (event.key === "ArrowLeft") { event.preventDefault(); selectViewMode("input"); } }} role="tab" type="button">측정 이력</button>
     </div> : null}
-  {!isHistory && showReportList ? <SearchConditions className="inspection-print-hide mb-3" summary={`검색 결과 ${visibleReports.length}건`}>
-    <form className="flex flex-col gap-3 p-3 @min-[640px]/workspace:flex-row @min-[640px]/workspace:items-end" id="measurement-report-search" onSubmit={(event) => { event.preventDefault(); loadReports(searchKeyword); }}>
-      <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium"><span>통합검색</span><span className="relative"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input className="h-12 w-full rounded-sm border border-input bg-background pl-10 pr-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" maxLength={100} onChange={(event) => setSearchKeyword(event.target.value)} placeholder="기종, 품번/도번, 품목상세명, 고객명" type="search" value={searchKeyword} /></span></label>
-      <div className="flex shrink-0 gap-2"><Button disabled={isSearchPending} onClick={() => { setSearchKeyword(""); loadReports(""); }} type="button" variant="secondary"><RotateCcw aria-hidden="true" />초기화</Button><Button disabled={isSearchPending} type="submit"><Search aria-hidden="true" />{isSearchPending ? "조회 중" : "조회"}</Button></div>
-    </form>
-    {searchError ? <p className="border-t border-border px-3 py-2 text-sm text-destructive" role="alert">{searchError}</p> : null}
-  </SearchConditions> : null}
-  <div aria-labelledby={showModeTabs ? viewMode === "input" ? "measurement-input-tab" : "measurement-history-tab" : undefined} className={cn("grid min-h-[680px] min-w-0 gap-5", fillContainer && "min-h-0 flex-1", showReportList && "@min-[1024px]/workspace:grid-cols-[280px_minmax(0,1fr)] @min-[1280px]/workspace:grid-cols-[300px_minmax(0,1fr)]")} id={showModeTabs ? viewMode === "input" ? "measurement-input-panel" : "measurement-history-panel" : undefined} role={showModeTabs ? "tabpanel" : undefined}>
-    {showReportList ? <aside aria-labelledby="measurement-report-list-title" className="min-w-0 self-start border-y border-border @min-[1024px]/workspace:sticky @min-[1024px]/workspace:top-0">
-      <div className="flex items-center justify-between bg-muted/70 px-4 py-3"><h2 className="font-semibold" id="measurement-report-list-title">검사성적서</h2><span className="text-xs text-muted-foreground">총 {visibleReports.length}건</span></div>
-      <div className="max-h-72 overflow-y-auto @min-[1024px]/workspace:max-h-[calc(100svh-190px)]">
-        {visibleReports.length ? <div className="divide-y divide-border">{visibleReports.map((value) => {
-          const selected = value.seq === selectedSeq;
-          return <button aria-pressed={selected} className={cn("block min-h-24 w-full px-4 py-3 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", selected && "bg-primary/10 hover:bg-primary/10")} key={value.seq} onClick={() => selectReport(value.seq)} type="button"><strong className="block truncate text-sm">#{value.seq} · {value.item_detail_code}</strong><span className="mt-2 block truncate text-sm text-foreground">{value.item_detail_name || "품목상세명 미입력"}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{value.model_name}{value.customer_name ? ` · ${value.customer_name}` : ""}</span></button>;
-        })}</div> : <p className="px-4 py-12 text-center text-sm text-muted-foreground">{data.reports.length ? "검색 결과가 없어요." : "등록된 검사성적서가 없어요."}</p>}
-      </div>
-    </aside> : null}
-
+  {!isHistory && showReportList ? <div className="inspection-print-hide mb-3 flex min-h-14 flex-col justify-center gap-3 border-y border-border bg-muted/35 px-4 py-3 @min-[640px]/workspace:flex-row @min-[640px]/workspace:items-center">
+    <div className="min-w-0 flex-1">{currentReport ? <><div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"><p className="min-w-0 truncate text-sm font-semibold">{currentReport.item_detail_name || "품목상세명 미입력"} ({currentReport.item_detail_code})</p>{loadFeedback?.phase === "success" ? <p aria-live="polite" className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary" role="status"><CheckCircle2 aria-hidden="true" size={15} />{loadFeedback.message}</p> : null}</div><p className="mt-1 truncate text-xs text-muted-foreground">{currentReport.model_name}{currentReport.customer_name ? ` · ${currentReport.customer_name}` : ""}</p></> : <p className="text-sm text-muted-foreground">측정할 검사성적서를 불러와 주세요.</p>}</div>
+    <div className="flex shrink-0 items-center gap-2">
+      <Button onClick={() => setReportPickerOpen(true)} type="button" variant={currentReport ? "secondary" : "default"}><FileSearch2 aria-hidden="true" />검사성적서 불러오기</Button>
+      {currentReport ? <div className="relative" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActionMenuOpen(false); }} onFocusCapture={() => setActionMenuOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setActionMenuOpen(false); } }} onMouseEnter={() => setActionMenuOpen(true)} onMouseLeave={() => setActionMenuOpen(false)}>
+        <div aria-label="측정결과 작업" className={cn("absolute right-0 top-[calc(100%+0.5rem)] z-50 flex min-w-max flex-col items-stretch gap-2 rounded-2xl border border-border bg-background p-2 shadow-xl transition-all duration-200", actionMenuOpen ? "visible translate-y-0 opacity-100" : "invisible -translate-y-2 opacity-0")} id="measurement-floating-actions">
+          <Button disabled={pending} onClick={() => { setActionMenuOpen(false); openRecentHistory(); }} type="button" variant="secondary"><Clock3 aria-hidden="true" />최근 이력</Button>
+          <Button disabled={pending} onClick={requestMeasurementReset} type="button" variant="secondary"><RotateCcw aria-hidden="true" />초기화</Button>
+          <Button disabled={pending} onClick={requestPrint} type="button" variant="secondary"><Printer aria-hidden="true" />인쇄</Button>
+          <Button data-save-submit="true" disabled={pending} form="inspection-measurement-form" name="eventType" onClick={() => setActionMenuOpen(false)} type="submit" value="save"><Save aria-hidden="true" />{pending ? "저장 중..." : "저장"}</Button>
+        </div>
+        <Button aria-controls="measurement-floating-actions" aria-expanded={actionMenuOpen} aria-label={actionMenuOpen ? "측정결과 작업 메뉴 닫기" : "측정결과 작업 메뉴 열기"} className="rounded-full shadow-sm" onClick={() => setActionMenuOpen((current) => !current)} size="icon-lg" type="button"><Plus aria-hidden="true" className={cn("transition-transform duration-200", actionMenuOpen && "rotate-45")} /></Button>
+      </div> : null}
+    </div>
+  </div> : null}
+  <div aria-labelledby={showModeTabs ? viewMode === "input" ? "measurement-input-tab" : "measurement-history-tab" : undefined} className={cn("min-h-[680px] min-w-0", fillContainer && "min-h-0 flex-1")} id={showModeTabs ? viewMode === "input" ? "measurement-input-panel" : "measurement-history-panel" : undefined} role={showModeTabs ? "tabpanel" : undefined}>
     <section aria-label={isHistory ? "측정 이력 조회" : "측정결과 입력"} className={cn("min-w-0", fillContainer && "h-full min-h-0")}>
-    {!report ? <div className="flex min-h-72 items-center justify-center border-y border-border p-10 text-center text-muted-foreground">{isHistory ? reportRuns.length ? "조회할 회차를 선택해 주세요." : "저장 또는 인쇄 이력이 없어요." : "왼쪽 목록에서 측정할 검사성적서를 선택해 주세요."}</div> : <form action={action} className={cn("inspection-measurement-form relative flex min-w-0 flex-col gap-3", fillContainer ? "h-full min-h-0" : "@min-[1024px]/workspace:h-[calc(100svh-190px)]")} onKeyDown={onSaveFormKeyDown}>
-      <input name="reportSeq" type="hidden" value={report.seq} /><input name="productTypeCodeSeq" type="hidden" value={selectedProductTypeSeq ?? ""} /><input name="items" type="hidden" value={JSON.stringify(submittedRows)} />
+    {!report ? <div className="flex min-h-72 flex-col items-center justify-center gap-4 border-y border-border p-10 text-center text-muted-foreground"><p>{isHistory ? reportRuns.length ? "조회할 회차를 선택해 주세요." : "저장 또는 인쇄 이력이 없어요." : "측정할 검사성적서를 먼저 불러와 주세요."}</p>{!isHistory && showReportList ? <Button onClick={() => setReportPickerOpen(true)} type="button"><FileSearch2 aria-hidden="true" />검사성적서 불러오기</Button> : null}</div> : <form action={action} className={cn("inspection-measurement-form relative flex min-w-0 flex-col gap-3", fillContainer ? "h-full min-h-0" : "@min-[1024px]/workspace:h-[calc(100svh-150px)]")} id="inspection-measurement-form" onKeyDown={onSaveFormKeyDown}>
+      <input name="reportSeq" type="hidden" value={report.seq} /><input name="productTypeCodeSeq" type="hidden" value={selectedProductTypeSeq ?? ""} /><input name="items" type="hidden" value={JSON.stringify(submittedRows)} /><button className="hidden" data-save-submit="true" disabled={pending} name="eventType" type="submit" value="save">저장</button><button className="hidden" data-print-submit="true" disabled={pending} name="eventType" type="submit" value="print">인쇄 전 저장</button>
       {isHistory && showHistorySelector ? <div className="inspection-print-hide flex flex-wrap items-center justify-end gap-2">
         <label className="text-sm font-medium" htmlFor="measurement-run">조회 회차</label>
         <div className="min-w-56">
@@ -302,7 +398,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
                 return <tr key={row.seq ?? `blank-${rowIndex}`}>
                   <td className="h-9 border-b border-r border-dashed border-black">{rowIndex + 1}</td>
                   <td className={cn("border-b border-r border-dashed border-black tabular-nums", !isNewRow && row.nominalDimension.trim().length > 7 && "print:!text-[8px]")}>{isNewRow ? <input aria-label={`${rowIndex + 1}번 신규 기준치수`} className="size-full bg-transparent px-1 text-center text-sm outline-none focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-blue-600 print:text-[10px]" disabled={isHistory} maxLength={100} value={row.nominalDimension} onChange={(event) => updateRow(rowIndex, { nominalDimension: event.target.value })} /> : row.nominalDimension}</td>
-                  <td className="border-b border-r border-dashed border-black tabular-nums">{isNewRow ? <div className="grid h-14 grid-rows-2 print:h-9"><input aria-label={`${rowIndex + 1}번 신규 공차 상한`} className="min-h-0 w-full bg-transparent px-1 text-center text-xs outline-none placeholder:text-neutral-400 focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-blue-600 print:placeholder:text-transparent" disabled={isHistory} inputMode="decimal" placeholder="상한" value={row.toleranceMax} onChange={(event) => updateRow(rowIndex, { toleranceMax: event.target.value })} /><input aria-label={`${rowIndex + 1}번 신규 공차 하한`} className="min-h-0 w-full border-t border-dashed border-black bg-transparent px-1 text-center text-xs outline-none placeholder:text-neutral-400 focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-blue-600 print:placeholder:text-transparent" disabled={isHistory} inputMode="decimal" placeholder="하한" value={row.toleranceMin} onChange={(event) => updateRow(rowIndex, { toleranceMin: event.target.value })} /></div> : <span className="whitespace-pre-line px-1 leading-tight">{toleranceText(row.toleranceMin, row.toleranceMax)}</span>}</td>
+                  <td className="border-b border-r border-dashed border-black tabular-nums">{isNewRow && !isHistory ? <div className="grid h-14 grid-rows-2 print:h-9"><input aria-label={`${rowIndex + 1}번 신규 공차 상한`} className="min-h-0 w-full bg-transparent px-1 text-center text-xs outline-none focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-blue-600" maxLength={100} value={row.toleranceMax} onChange={(event) => updateRow(rowIndex, { toleranceMax: event.target.value })} /><input aria-label={`${rowIndex + 1}번 신규 공차 하한`} className="min-h-0 w-full border-t border-dashed border-black bg-transparent px-1 text-center text-xs outline-none focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-blue-600 print:border-t-0" maxLength={100} value={row.toleranceMin} onChange={(event) => updateRow(rowIndex, { toleranceMin: event.target.value })} /></div> : <span className="whitespace-pre-line px-1 leading-tight">{toleranceText(row.toleranceMin, row.toleranceMax)}</span>}</td>
                   {row.results.map((result, resultIndex) => { const enabled = report.sample_count === null || resultIndex < report.sample_count; return <td className={cn("border-b border-r border-dashed border-black", !enabled && "bg-neutral-100")} key={resultIndex}><div className="grid h-14 grid-rows-2 print:h-9"><input aria-label={`${rowIndex + 1}번 항목 X${resultIndex + 1}`} className="size-full bg-transparent px-1 text-center text-base outline-none focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100 print:text-[11px]" disabled={isHistory || !enabled} inputMode="decimal" value={enabled ? result : ""} onChange={(event) => updateResult(rowIndex, resultIndex, event.target.value)} /><span aria-hidden="true" className="border-t border-dashed border-black"/></div></td>;})}
                   <td className="border-b border-dashed border-black"><input aria-label={`${rowIndex + 1}번 항목 비고`} className="h-9 w-full bg-transparent px-1 outline-none focus:bg-blue-50 focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100" disabled={isHistory} maxLength={500} value={row.note} onChange={(event) => updateRow(rowIndex, { note: event.target.value })} /></td>
                 </tr>;
@@ -316,17 +412,32 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
           <time className="inspection-print-datetime" dateTime={printDateTime}>{printDateTime}</time>
         </article>
       </div>
-      {isHistory ? <div className={cn("inspection-print-hide flex items-center justify-end", floatingPrintButton ? "fixed bottom-6 right-6 z-[90] rounded-full border border-border bg-background p-2 shadow-xl sm:bottom-9 sm:right-9" : "sticky bottom-0 z-30 py-2")}><Button disabled={pending} onClick={() => { preparePrint(); window.setTimeout(openPrintDialog, 0); }} type="button" variant="secondary"><Printer aria-hidden="true" />인쇄</Button></div> : <div className="inspection-print-hide absolute bottom-4 right-4 z-40 flex flex-col items-end gap-2" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActionMenuOpen(false); }} onFocusCapture={() => setActionMenuOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setActionMenuOpen(false); } }} onMouseEnter={() => setActionMenuOpen(true)} onMouseLeave={() => setActionMenuOpen(false)}>
-        <div aria-label="측정결과 작업" className={cn("flex flex-col items-end gap-2 transition-all duration-200", actionMenuOpen ? "visible translate-y-0 opacity-100" : "invisible translate-y-2 opacity-0")} id="measurement-floating-actions">
-          <Button disabled={pending || !currentReport} onClick={() => { setActionMenuOpen(false); openRecentHistory(); }} type="button" variant="secondary"><Clock3 aria-hidden="true" />최근 이력</Button>
-          <Button disabled={pending} onClick={requestMeasurementReset} type="button" variant="secondary"><RotateCcw aria-hidden="true" />초기화</Button>
-          <Button disabled={pending} onClick={() => { setActionMenuOpen(false); preparePrint(); window.setTimeout(openPrintDialog, 0); }} type="button" variant="secondary"><Printer aria-hidden="true" />인쇄</Button>
-          <Button data-save-submit="true" disabled={pending} name="eventType" onClick={() => setActionMenuOpen(false)} type="submit" value="save"><Save aria-hidden="true" />{pending ? "저장 중..." : "저장"}</Button>
-        </div>
-        <Button aria-controls="measurement-floating-actions" aria-expanded={actionMenuOpen} aria-label={actionMenuOpen ? "측정결과 작업 메뉴 닫기" : "측정결과 작업 메뉴 열기"} className="rounded-full shadow-xl" onClick={() => setActionMenuOpen((current) => !current)} size="icon-lg" type="button"><Plus aria-hidden="true" className={cn("transition-transform duration-200", actionMenuOpen && "rotate-45")} /></Button>
-      </div>}
+      {isHistory ? <div className={cn("inspection-print-hide flex items-center justify-end", floatingPrintButton ? "fixed bottom-6 right-6 z-[90] rounded-full border border-border bg-background p-2 shadow-xl sm:bottom-9 sm:right-9" : "sticky bottom-0 z-30 py-2")}><Button disabled={pending} onClick={() => { preparePrint(); window.setTimeout(openPrintDialog, 0); }} type="button" variant="secondary"><Printer aria-hidden="true" />인쇄</Button></div> : null}
     </form>}
     </section>
+    <Dialog.Root open={reportPickerOpen} onOpenChange={setReportPickerOpen}>
+      <WorkspaceDialogPortal>
+        <Dialog.Backdrop className="fixed inset-0 z-[70] bg-foreground/35 backdrop-blur-[2px]" />
+        <Dialog.Viewport className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-5">
+          <Dialog.Popup className="flex max-h-[calc(100svh-1.5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-xl outline-none sm:max-h-[calc(100svh-2.5rem)]">
+            <div className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-border px-5">
+              <div className="min-w-0"><Dialog.Title className="text-lg font-semibold">검사성적서 불러오기</Dialog.Title><Dialog.Description className="mt-1 text-sm text-muted-foreground">측정할 검사성적서를 검색한 뒤 선택해 주세요.</Dialog.Description></div>
+              <Dialog.Close aria-label="검사성적서 불러오기 닫기" className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-accent"><X aria-hidden="true" /></Dialog.Close>
+            </div>
+            <form className="flex shrink-0 flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-end sm:p-5" onSubmit={(event) => { event.preventDefault(); loadReports(searchKeyword); }}>
+              <label className="grid min-w-0 flex-1 gap-1.5 text-sm font-medium"><span>통합검색</span><span className="relative"><Search aria-hidden="true" className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><input autoFocus className="h-12 w-full rounded-sm border border-input bg-background pl-10 pr-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" maxLength={100} onChange={(event) => setSearchKeyword(event.target.value)} placeholder="기종, 품번/도번, 품목상세명, 고객명" type="search" value={searchKeyword} /></span></label>
+              <div className="flex shrink-0 gap-2"><Button disabled={isSearchPending} onClick={() => { setSearchKeyword(""); loadReports(""); }} type="button" variant="secondary"><RotateCcw aria-hidden="true" />초기화</Button><Button disabled={isSearchPending} type="submit"><Search aria-hidden="true" />{isSearchPending ? "조회 중" : "조회"}</Button></div>
+            </form>
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex min-h-11 shrink-0 items-center justify-between bg-muted/50 px-5"><h3 className="text-sm font-semibold">검색 결과</h3><span className="text-xs text-muted-foreground">총 {pickerReports.length}건</span></div>
+              <div aria-busy={isSearchPending} className="min-h-48 overflow-y-auto">
+                {searchError ? <p className="p-10 text-center text-sm text-destructive" role="alert">{searchError}</p> : pickerReports.length ? <ul className="divide-y divide-border">{pickerReports.map((value) => <li className={cn("flex min-h-20 flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center", value.seq === selectedSeq && "bg-primary/5")} key={value.seq}><div className="min-w-0 flex-1"><p className="truncate font-semibold">{value.item_detail_name || "품목상세명 미입력"} ({value.item_detail_code})</p><p className="mt-1 truncate text-sm text-muted-foreground">기종 {value.model_name}{value.customer_name ? ` · 고객 ${value.customer_name}` : ""}</p></div><Button aria-label={`${value.item_detail_code} 검사성적서 선택`} className="shrink-0" onClick={() => selectReport(value.seq)} type="button" variant={value.seq === selectedSeq ? "secondary" : "default"}>{value.seq === selectedSeq ? "선택됨" : "선택"}</Button></li>)}</ul> : <p className="p-10 text-center text-sm text-muted-foreground">검색 결과가 없어요.</p>}
+              </div>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Viewport>
+      </WorkspaceDialogPortal>
+    </Dialog.Root>
     {fullscreen && item?.image_url ? <MarkerFullscreenDialog label={item.item_detail_name} markers={markers} onClose={() => setFullscreen(false)} url={item.image_url} /> : null}
     <Dialog.Root open={recentHistoryOpen} onOpenChange={setRecentHistoryOpen}>
       <WorkspaceDialogPortal>
