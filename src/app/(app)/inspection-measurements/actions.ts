@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import type { InspectionMeasurementRunItem, InspectionReport } from "../inspection-reports/types";
 
-const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
+const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
 
 export type RecentMeasurementRun = {
   seq: number;
@@ -27,7 +27,7 @@ export async function searchMeasurementReports(keywordValue: string): Promise<{ 
   if (!user) return { rows: [], error: "로그인이 필요해요." };
 
   const keyword = keywordValue.trim().slice(0, 100);
-  let request = supabase.from("inspection_reports").select(reportColumns);
+  let request = supabase.from("inspection_reports").select(reportColumns).eq("is_deleted", false);
   if (keyword) {
     const escapedKeyword = keyword.replaceAll("%", "\\%").replaceAll("_", "\\_").replaceAll(",", " ");
     request = request.or(["model_name", "item_detail_code", "item_detail_name", "customer_name"].map((column) => `${column}.ilike.%${escapedKeyword}%`).join(","));
@@ -47,7 +47,7 @@ export async function getRecentMeasurementHistory(inspectionReportSeq: number): 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { runs: [], error: "로그인이 필요해요." };
 
-  const { data: report, error: reportError } = await supabase.from("inspection_reports").select("seq").eq("seq", inspectionReportSeq).maybeSingle();
+  const { data: report, error: reportError } = await supabase.from("inspection_reports").select("seq").eq("seq", inspectionReportSeq).eq("is_deleted", false).maybeSingle();
   if (reportError || !report) {
     console.error("Failed to verify report for recent measurement history", { code: reportError?.code });
     return { runs: [], error: "검사성적서를 확인하지 못했어요." };
@@ -57,6 +57,7 @@ export async function getRecentMeasurementHistory(inspectionReportSeq: number): 
     .from("inspection_measurement_runs")
     .select("seq, run_no, event_type, created_at")
     .eq("inspection_report_seq", inspectionReportSeq)
+    .eq("is_deleted", false)
     .order("created_at", { ascending: false })
     .order("seq", { ascending: false })
     .limit(5);

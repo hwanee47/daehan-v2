@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
 import type {
   CellKeyDownEvent,
@@ -10,13 +11,13 @@ import type {
 } from "ag-grid-community";
 import { AllCommunityModule } from "ag-grid-community";
 import { AgGridProvider, AgGridReact } from "ag-grid-react";
-import { ChevronLeft, ChevronRight, Eye, RotateCcw, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, RotateCcw, Search, Trash2, X } from "lucide-react";
 import { FormEvent, useMemo, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { SearchConditions } from "@/components/ui/search-conditions";
 import { Select } from "@/components/ui/select";
-import { WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
+import { WorkspaceAlertDialogPortal, WorkspaceDialogPortal } from "@/components/ui/workspace-portal";
 import {
   appGridSingleRowSelection,
   appGridTheme,
@@ -28,7 +29,7 @@ import type {
   InspectionMeasurementRun,
   InspectionReportData,
 } from "../inspection-reports/types";
-import { getMeasurementHistoryDetail, searchMeasurementHistory, searchMeasurementModelGroups, searchMeasurementModelReports, searchMeasurementReportRuns } from "./actions";
+import { deleteMeasurementHistory, getMeasurementHistoryDetail, searchMeasurementHistory, searchMeasurementModelGroups, searchMeasurementModelReports, searchMeasurementReportRuns } from "./actions";
 import type { MeasurementHistoryDetail, MeasurementHistoryFilters, MeasurementHistoryPage, MeasurementHistorySearchField, MeasurementModelGroup, MeasurementModelGroupPage, MeasurementModelReport, MeasurementModelReportPage } from "./types";
 
 const modules = [AllCommunityModule];
@@ -64,8 +65,11 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
   const [selectedRunSeq, setSelectedRunSeq] = useState<number | null>(null);
   const [viewingRun, setViewingRun] = useState<InspectionMeasurementRun | null>(null);
   const [detail, setDetail] = useState<MeasurementHistoryDetail | null>(null);
+  const [deletingRun, setDeletingRun] = useState<InspectionMeasurementRun | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isSearching, startSearchTransition] = useTransition();
   const [isDetailLoading, startDetailTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
   const rows = history.rows;
 
   const columns = useMemo<ColDef<InspectionMeasurementRun>[]>(
@@ -89,9 +93,9 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
       { field: "customer_name", flex: 1, headerName: "고객명", minWidth: 140 },
       {
         colId: "view",
-        headerName: "성적서보기",
-        minWidth: 130,
-        maxWidth: 140,
+        headerName: "관리",
+        minWidth: 210,
+        maxWidth: 220,
         pinned: "right",
         sortable: false,
         cellRenderer: ({ data: run }: ICellRendererParams<InspectionMeasurementRun>) =>
@@ -110,6 +114,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
                 <Eye aria-hidden="true" />
                 보기
               </Button>
+              <Button aria-label={`${run.run_no}회차 측정이력 삭제`} className="ml-2 h-8" onClick={(event) => { event.stopPropagation(); setDeleteError(null); setDeletingRun(run); }} size="sm" variant="destructive"><Trash2 aria-hidden="true" />삭제</Button>
             </div>
           ) : null,
       },
@@ -151,7 +156,7 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
       { field: "run_no", headerName: "회차", minWidth: 80, maxWidth: 95, valueFormatter: ({ value }) => `${value}회차` },
       { field: "created_at", flex: 1, headerName: "저장일시", minWidth: 180, valueFormatter: ({ value }) => new Date(String(value)).toLocaleString("ko-KR") },
       { field: "product_type_name", headerName: "제품구분", minWidth: 120, valueFormatter: ({ value }) => String(value ?? "") },
-      { colId: "view", headerName: "성적서보기", minWidth: 130, maxWidth: 140, pinned: "right", sortable: false, cellRenderer: ({ data: run }: ICellRendererParams<InspectionMeasurementRun>) => run ? <div className="flex h-full items-center"><Button className="h-8" onClick={(event) => { event.stopPropagation(); openRun(run); }} size="sm" variant="secondary"><Eye aria-hidden="true" />보기</Button></div> : null },
+      { colId: "view", headerName: "관리", minWidth: 210, maxWidth: 220, pinned: "right", sortable: false, cellRenderer: ({ data: run }: ICellRendererParams<InspectionMeasurementRun>) => run ? <div className="flex h-full items-center"><Button className="h-8" onClick={(event) => { event.stopPropagation(); openRun(run); }} size="sm" variant="secondary"><Eye aria-hidden="true" />보기</Button><Button aria-label={`${run.run_no}회차 측정이력 삭제`} className="ml-2 h-8" onClick={(event) => { event.stopPropagation(); setDeleteError(null); setDeletingRun(run); }} size="sm" variant="destructive"><Trash2 aria-hidden="true" />삭제</Button></div> : null },
     ],
     [],
   );
@@ -237,6 +242,29 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
     setFilters(emptyFilters);
     if (viewMode === "runs") loadHistory(emptyFilters, 1);
     else loadModelGroups(emptyFilters, 1);
+  }
+
+  function confirmDeleteRun() {
+    if (!deletingRun) return;
+    const run = deletingRun;
+    startDeleteTransition(async () => {
+      const result = await deleteMeasurementHistory(run.seq);
+      if (result.error) {
+        setDeleteError(result.error);
+        return;
+      }
+      setDeletingRun(null);
+      setDeleteError(null);
+      setSelectedRunSeq((current) => current === run.seq ? null : current);
+      if (viewingRun?.seq === run.seq) {
+        setViewingRun(null);
+        setDetail(null);
+      }
+      setHistory(await searchMeasurementHistory({ ...filters, page: history.page }));
+      if (modelGroupsLoaded) setModelGroups(await searchMeasurementModelGroups({ ...filters, page: modelGroups.page }));
+      if (viewingModel) setModelReports(await searchMeasurementModelReports(viewingModel.model_name, modelReports.page));
+      if (selectedReportSeq && reportRuns) setReportRuns(await searchMeasurementReportRuns(selectedReportSeq, reportRuns.page));
+    });
   }
 
   if (data.hasError) {
@@ -412,6 +440,20 @@ export function InspectionMeasurementHistory({ data, initialHistory }: { data: I
           </Dialog.Viewport>
         </WorkspaceDialogPortal>
       </Dialog.Root>
+
+      <AlertDialog.Root open={deletingRun !== null} onOpenChange={(open) => { if (!open && !isDeleting) { setDeletingRun(null); setDeleteError(null); } }}>
+        <WorkspaceAlertDialogPortal>
+          <AlertDialog.Backdrop className="fixed inset-0 z-[90] bg-foreground/30 backdrop-blur-[2px]" />
+          <AlertDialog.Viewport className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+            <AlertDialog.Popup className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-xl outline-none">
+              <AlertDialog.Title className="text-xl font-semibold">측정이력을 삭제할까요?</AlertDialog.Title>
+              <AlertDialog.Description className="mt-3 text-muted-foreground">{deletingRun ? `${deletingRun.run_no}회차 이력은 목록과 집계에서 숨겨지고 상세 데이터는 보존돼요.` : "선택한 측정이력을 삭제해요."}</AlertDialog.Description>
+              {deleteError ? <p className="mt-4 text-sm text-destructive" role="alert">{deleteError}</p> : null}
+              <div className="mt-6 flex justify-end gap-3"><AlertDialog.Close className="inline-flex h-11 items-center rounded-xl bg-secondary px-5 font-semibold" disabled={isDeleting}>취소</AlertDialog.Close><Button disabled={isDeleting} onClick={confirmDeleteRun} type="button" variant="destructive">{isDeleting ? "삭제 중..." : "삭제"}</Button></div>
+            </AlertDialog.Popup>
+          </AlertDialog.Viewport>
+        </WorkspaceAlertDialogPortal>
+      </AlertDialog.Root>
     </div>
   );
 }

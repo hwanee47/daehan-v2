@@ -40,13 +40,6 @@ export default async function LoginPage() {
           </div>
 
           <LoginForm />
-
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            아직 계정이 없나요?{" "}
-            <Link className="font-semibold text-primary underline-offset-4 hover:underline" href="/signup">
-              회원가입
-            </Link>
-          </p>
         </section>
       </Container>
     </main>

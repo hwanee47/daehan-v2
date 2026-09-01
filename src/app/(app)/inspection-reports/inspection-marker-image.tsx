@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { cn } from "@/lib/utils";
@@ -37,18 +37,9 @@ export function InspectionMarkerImage({
   verticalAlign?: "center" | "top";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [naturalSize, setNaturalSize] = useState({ height: 0, width: 0 });
+  const [loadedImage, setLoadedImage] = useState({ height: 0, url: "", width: 0 });
   const [box, setBox] = useState<ImageBox>({ height: 0, left: 0, top: 0, width: 0 });
-
-  useEffect(() => {
-    let active = true;
-    const source = new window.Image();
-    source.onload = () => {
-      if (active) setNaturalSize({ width: source.naturalWidth, height: source.naturalHeight });
-    };
-    source.src = url;
-    return () => { active = false; };
-  }, [url]);
+  const naturalSize = useMemo(() => loadedImage.url === url ? loadedImage : { height: 0, width: 0 }, [loadedImage, url]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -102,11 +93,15 @@ export function InspectionMarkerImage({
         alt={alt}
         className={cn("pointer-events-none object-contain", verticalAlign === "top" ? "object-top" : "object-center")}
         fill
+        onLoad={(event) => {
+          const image = event.currentTarget;
+          setLoadedImage({ height: image.naturalHeight, url, width: image.naturalWidth });
+        }}
         sizes="100vw"
         src={url}
         unoptimized
       />
-      {naturalSize.width > 0 && naturalSize.height > 0 ? <div className="pointer-events-none absolute" style={{ height: box.height, left: box.left, top: box.top, width: box.width }}>
+      {naturalSize.width > 0 && naturalSize.height > 0 ? <div className="pointer-events-none absolute z-10" style={{ height: box.height, left: box.left, top: box.top, width: box.width }}>
         <div aria-label={`${alt} 검사 위치`} className="inspection-marker-screen-overlay absolute inset-0" role="img">
           {markers.map((marker) => <span
             aria-label={`${marker.label}번 검사 위치`}

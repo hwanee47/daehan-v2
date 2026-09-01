@@ -167,6 +167,10 @@
   width: 80px;
 }
 
+.inspection-result-columns {
+  grid-template-columns: 40px 80px 72px repeat(10, minmax(0, 1fr)) 80px;
+}
+
 .inspection-marker-print-overlay {
   display: none;
 }
@@ -234,6 +238,10 @@
 
   body:has(.inspection-print-sheet) .inspection-print-sheet table col:nth-child(14) {
     width: 60px;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-result-columns {
+    grid-template-columns: 30px 56px 54px repeat(10, minmax(0, 1fr)) 60px;
   }
 
   body:has(.inspection-print-sheet) .inspection-print-datetime {

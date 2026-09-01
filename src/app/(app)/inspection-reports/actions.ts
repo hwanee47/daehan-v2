@@ -12,7 +12,7 @@ const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
 const codeManagementPath = "/master/codes";
 const reportPageSize = 50;
-const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
+const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
 const reportSearchColumns = { model: "model_name", drawing: "item_detail_code", itemName: "item_name", customer: "customer_name", supplier: "supplier_name" } as const;
 
 function safeSearchTerm(value: string) {
@@ -26,7 +26,7 @@ export async function searchInspectionReports(query: InspectionReportQuery): Pro
   if (!user) return { rows: [], total: 0, page, pageSize: reportPageSize, error: "로그인이 필요해요." };
 
   const keyword = safeSearchTerm(query.keyword);
-  let request = supabase.from("inspection_reports").select(reportColumns, { count: "exact" });
+  let request = supabase.from("inspection_reports").select(reportColumns, { count: "exact" }).eq("is_deleted", false);
   if (keyword) {
     if (query.searchField === "all") {
       const filters = ["model_name", "item_code", "item_name", "item_detail_code", "item_detail_name", "customer_name", "supplier_name"].map((column) => `${column}.ilike.*${keyword}*`);
@@ -219,7 +219,7 @@ export async function saveInspectionReport(
       resetMeasurementsToNewStructure = true;
     }
     replaceItems = structureChanged;
-    const { error } = await supabase.from("inspection_reports").update(masterValues).eq("seq", seq);
+    const { error } = await supabase.from("inspection_reports").update(masterValues).eq("seq", seq).eq("is_deleted", false);
     if (error) { console.error("Failed to update inspection report", { code: error.code }); return mutationError(error.code === "23514" ? "제품구분 코드를 확인해 주세요." : undefined); }
     if (replaceItems) {
       const { error: deleteError } = await supabase.from("inspection_report_items").delete().eq("inspection_report_seq", seq);
@@ -319,12 +319,12 @@ export async function deleteInspectionReport(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return mutationError("로그인이 필요해요.");
-  const { error } = await supabase.from("inspection_reports").delete().eq("seq", seq);
-  if (error) { console.error("Failed to delete inspection report", { code: error.code }); return mutationError("검사성적서를 삭제하지 못했어요. 권한을 확인해 주세요."); }
+  const { data, error } = await supabase.rpc("soft_delete_inspection_report", { p_seq: seq });
+  if (error || !data) { console.error("Failed to soft delete inspection report", { code: error?.code }); return mutationError("검사성적서를 삭제하지 못했어요. 이미 삭제되었는지 확인해 주세요."); }
   revalidatePath(inspectionReportsPath);
   revalidatePath(inspectionMeasurementsPath);
   revalidatePath("/", "layout");
-  return { status: "success", message: "검사성적서를 삭제했어요." };
+  return { status: "success", message: "검사성적서를 삭제 처리했어요." };
 }
 
 export async function saveInspectionMeasurements(
@@ -337,11 +337,21 @@ export async function saveInspectionMeasurements(
   const eventTypeText = text(formData, "eventType");
   const eventType = eventTypeText === "save" || eventTypeText === "print" ? eventTypeText : null;
   const parsedRows = parseItems(text(formData, "items"));
+  const modelName = text(formData, "modelName");
+  const itemDetailName = text(formData, "itemDetailName");
+  const itemDetailCode = text(formData, "itemDetailCode");
+  const customerName = text(formData, "customerName");
+  const supplierName = text(formData, "supplierName");
+  const deliveryQuantityText = text(formData, "deliveryQuantity");
+  const sampleCountText = text(formData, "sampleCount");
+  const deliveryDate = text(formData, "deliveryDate");
   const material = text(formData, "material");
   const hardness = text(formData, "hardness");
   const heatTreatment = text(formData, "heatTreatment");
   const rows = parsedRows?.filter((row) => row.seq || row.nominalDimension.trim() || toleranceText(row.toleranceMin) || toleranceText(row.toleranceMax) || row.results.some((result) => result.trim()) || row.note.trim());
   if (!reportSeq || !rows || !eventType || productTypeCodeText && !productTypeCodeSeq) return mutationError("측정할 성적서와 제품구분, 결과를 확인해 주세요.");
+  if (!modelName || !itemDetailName || !itemDetailCode || modelName.length > 100 || itemDetailName.length > 200 || itemDetailCode.length > 100 || customerName.length > 100 || supplierName.length > 100) return mutationError("성적서 기본정보를 다시 확인해 주세요.");
+  if (deliveryQuantityText.length > 100 || sampleCountText.length > 100 || deliveryDate.length > 100) return mutationError("납품수량, 시료수와 납품일자는 100자 이하로 입력해 주세요.");
   if (material.length > 100 || hardness.length > 100 || heatTreatment.length > 100) return mutationError("재질, 경도와 열처리는 100자 이하로 입력해 주세요.");
 
   for (let index = 0; index < rows.length; index += 1) {
@@ -360,7 +370,7 @@ export async function saveInspectionMeasurements(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return mutationError("로그인이 필요해요.");
-  const { data: report } = await supabase.from("inspection_reports").select("sample_count").eq("seq", reportSeq).maybeSingle();
+  const { data: report } = await supabase.from("inspection_reports").select("sample_count").eq("seq", reportSeq).eq("is_deleted", false).maybeSingle();
   if (!report) return mutationError("측정할 성적서를 다시 확인해 주세요.");
   if (productTypeCodeSeq) {
     const { data: productType, error: productTypeError } = await supabase.from("code_details").select("seq, code_groups!inner(group_code)").eq("seq", productTypeCodeSeq).eq("is_active", true).eq("code_groups.group_code", "U0002").maybeSingle();
@@ -387,6 +397,14 @@ export async function saveInspectionMeasurements(
     p_inspection_report_seq: reportSeq,
     p_product_type_code_seq: productTypeCodeSeq,
     p_event_type: eventType,
+    p_model_name: modelName,
+    p_item_detail_code: itemDetailCode,
+    p_item_detail_name: itemDetailName,
+    p_customer_name: customerName,
+    p_supplier_name: supplierName,
+    p_delivery_quantity_text: deliveryQuantityText,
+    p_sample_count_text: sampleCountText,
+    p_delivery_date_text: deliveryDate,
     p_material: material,
     p_hardness: hardness,
     p_heat_treatment: heatTreatment,

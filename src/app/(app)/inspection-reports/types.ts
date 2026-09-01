@@ -14,6 +14,10 @@ export type InspectionReport = {
   supplier_name: string | null;
   delivery_quantity: number | null;
   sample_count: number | null;
+  delivery_date: string | null;
+  delivery_quantity_text: string | null;
+  sample_count_text: string | null;
+  delivery_date_text: string | null;
   product_type_code_seq: number | null;
   product_type_code: string | null;
   product_type_name: string | null;
@@ -66,6 +70,10 @@ export type InspectionMeasurementRun = {
   supplier_name: string | null;
   delivery_quantity: number | null;
   sample_count: number | null;
+  delivery_date: string | null;
+  delivery_quantity_text: string | null;
+  sample_count_text: string | null;
+  delivery_date_text: string | null;
   product_type_code_seq: number | null;
   product_type_code: string | null;
   product_type_name: string | null;

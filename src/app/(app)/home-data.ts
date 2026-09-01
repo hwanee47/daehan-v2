@@ -30,11 +30,11 @@ export async function getHomeDashboardData(): Promise<HomeDashboardData | null> 
   const { start, end, label } = seoulDayBounds();
   const [profileResult, reportsResult, runReportsResult, recentRunsResult, savedTodayResult, printedTodayResult, itemsResult, detailsResult, rangesResult, reportItemsResult] = await Promise.all([
     supabase.from("users").select("role").eq("id", user.id).maybeSingle(),
-    supabase.from("inspection_reports").select("seq, model_name, item_detail_code, customer_name, created_at").order("created_at", { ascending: false }).order("seq", { ascending: false }),
-    supabase.from("inspection_measurement_runs").select("inspection_report_seq").in("event_type", ["save", "print"]),
-    supabase.from("inspection_measurement_runs").select("seq, event_type, model_name, item_detail_code, item_name, customer_name, created_at").in("event_type", ["save", "print"]).order("created_at", { ascending: false }).order("seq", { ascending: false }).limit(8),
-    supabase.from("inspection_measurement_runs").select("seq", { count: "exact", head: true }).eq("event_type", "save").gte("created_at", start).lt("created_at", end),
-    supabase.from("inspection_measurement_runs").select("seq", { count: "exact", head: true }).eq("event_type", "print").gte("created_at", start).lt("created_at", end),
+    supabase.from("inspection_reports").select("seq, model_name, item_detail_code, customer_name, created_at").eq("is_deleted", false).order("created_at", { ascending: false }).order("seq", { ascending: false }),
+    supabase.from("inspection_measurement_runs").select("inspection_report_seq").eq("is_deleted", false).in("event_type", ["save", "print"]),
+    supabase.from("inspection_measurement_runs").select("seq, event_type, model_name, item_detail_code, item_name, customer_name, created_at").eq("is_deleted", false).in("event_type", ["save", "print"]).order("created_at", { ascending: false }).order("seq", { ascending: false }).limit(8),
+    supabase.from("inspection_measurement_runs").select("seq", { count: "exact", head: true }).eq("is_deleted", false).eq("event_type", "save").gte("created_at", start).lt("created_at", end),
+    supabase.from("inspection_measurement_runs").select("seq", { count: "exact", head: true }).eq("is_deleted", false).eq("event_type", "print").gte("created_at", start).lt("created_at", end),
     supabase.from("items").select("seq"),
     supabase.from("item_details").select("seq, item_seq, image_path"),
     supabase.from("item_tolerance_ranges").select("item_seq"),

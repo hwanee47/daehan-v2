@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { itemImageBucket } from "@/lib/item-images";
 import { createClient } from "@/lib/supabase/server";
 import { createSignedFileUrls } from "@/lib/supabase/storage";
@@ -9,7 +11,7 @@ import type { MeasurementHistoryDetail, MeasurementHistoryPage, MeasurementHisto
 
 const pageSize = 50;
 const searchColumns = { model: "model_name", drawing: "item_detail_code", itemName: "item_name", customer: "customer_name" } as const;
-const runColumns = "seq, inspection_report_seq, run_no, event_type, model_name, item_seq, item_code, item_detail_seq, item_detail_code, item_detail_name, item_name, customer_name, supplier_name, delivery_quantity, sample_count, product_type_code_seq, product_type_code, product_type_name, material, hardness, heat_treatment, image_path, created_at";
+const runColumns = "seq, inspection_report_seq, run_no, event_type, model_name, item_seq, item_code, item_detail_seq, item_detail_code, item_detail_name, item_name, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, material, hardness, heat_treatment, image_path, created_at";
 const runItemColumns = "seq, measurement_run_seq, source_report_item_seq, sort_order, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio, result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10, note";
 
 function validDate(value: string) {
@@ -22,13 +24,29 @@ function dayBoundary(value: string, nextDay = false) {
   return date.toISOString();
 }
 
+export async function deleteMeasurementHistory(runSeq: number): Promise<{ error: string | null }> {
+  if (!Number.isSafeInteger(runSeq) || runSeq <= 0) return { error: "삭제할 측정이력을 확인해 주세요." };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "로그인이 필요해요." };
+  const { data, error } = await supabase.rpc("soft_delete_inspection_measurement_run", { p_seq: runSeq });
+  if (error || !data) {
+    console.error("Failed to soft delete measurement history", { code: error?.code });
+    return { error: "측정이력을 삭제하지 못했어요. 이미 삭제되었는지 확인해 주세요." };
+  }
+  revalidatePath("/inspection-measurement-history");
+  revalidatePath("/inspection-measurements");
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
 export async function searchMeasurementHistory(query: MeasurementHistoryQuery): Promise<MeasurementHistoryPage> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const page = Number.isInteger(query.page) && query.page > 0 && query.page <= 1_000_000 ? query.page : 1;
   if (!user) return { rows: [], total: 0, page, pageSize, error: "로그인이 필요해요." };
 
-  let request = supabase.from("inspection_measurement_runs").select(runColumns, { count: "exact" });
+  let request = supabase.from("inspection_measurement_runs").select(runColumns, { count: "exact" }).eq("is_deleted", false);
   if (validDate(query.dateFrom)) request = request.gte("created_at", dayBoundary(query.dateFrom));
   if (validDate(query.dateTo)) request = request.lt("created_at", dayBoundary(query.dateTo, true));
 
@@ -115,7 +133,7 @@ export async function searchMeasurementReportRuns(reportSeq: number, page: numbe
   const { data: { user } } = await supabase.auth.getUser();
   if (!user || !Number.isSafeInteger(reportSeq) || reportSeq <= 0) return { rows: [], total: 0, page: safePage, pageSize, error: "조회할 검사서를 확인해 주세요." };
   const from = (safePage - 1) * pageSize;
-  const { data, error, count } = await supabase.from("inspection_measurement_runs").select(runColumns, { count: "exact" }).eq("inspection_report_seq", reportSeq).order("created_at", { ascending: false }).order("seq", { ascending: false }).range(from, from + pageSize - 1);
+  const { data, error, count } = await supabase.from("inspection_measurement_runs").select(runColumns, { count: "exact" }).eq("inspection_report_seq", reportSeq).eq("is_deleted", false).order("created_at", { ascending: false }).order("seq", { ascending: false }).range(from, from + pageSize - 1);
   if (error) {
     console.error("Failed to search report measurement runs", { code: error.code });
     return { rows: [], total: 0, page: safePage, pageSize, error: "검사서의 측정 이력을 조회하지 못했어요." };
@@ -129,7 +147,7 @@ export async function getMeasurementHistoryDetail(runSeq: number): Promise<Measu
   if (!user || !Number.isInteger(runSeq) || runSeq <= 0) return { run: null, items: [], error: "조회할 이력을 확인해 주세요." };
 
   const [runResult, itemsResult] = await Promise.all([
-    supabase.from("inspection_measurement_runs").select(runColumns).eq("seq", runSeq).maybeSingle(),
+    supabase.from("inspection_measurement_runs").select(runColumns).eq("seq", runSeq).eq("is_deleted", false).maybeSingle(),
     supabase.from("inspection_measurement_run_items").select(runItemColumns).eq("measurement_run_seq", runSeq).order("sort_order"),
   ]);
   if (runResult.error || itemsResult.error || !runResult.data) {
