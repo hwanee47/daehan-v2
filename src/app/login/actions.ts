@@ -1,7 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
+import { persistentPreferenceCookieOptions, rememberLoginCookieName, sessionPreferenceCookieOptions } from "@/lib/supabase/auth-cookies";
 import { createClient } from "@/lib/supabase/server";
 
 export type LoginState = {
@@ -9,6 +11,7 @@ export type LoginState = {
   message?: string;
   fields?: {
     email?: string;
+    rememberLogin?: boolean;
   };
   errors?: Partial<Record<"email" | "password", string>>;
 };
@@ -19,6 +22,7 @@ export async function login(
 ): Promise<LoginState> {
   const emailValue = formData.get("email");
   const passwordValue = formData.get("password");
+  const rememberLogin = formData.get("rememberLogin") === "on";
   const email = typeof emailValue === "string" ? emailValue.trim().toLowerCase() : "";
   const password = typeof passwordValue === "string" ? passwordValue : "";
   const errors: LoginState["errors"] = {};
@@ -35,12 +39,12 @@ export async function login(
     return {
       status: "error",
       message: "입력한 내용을 다시 확인해 주세요.",
-      fields: { email },
+      fields: { email, rememberLogin },
       errors,
     };
   }
 
-  const supabase = await createClient();
+  const supabase = await createClient({ rememberLogin });
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
@@ -52,10 +56,16 @@ export async function login(
     return {
       status: "error",
       message: "이메일 또는 비밀번호를 확인해 주세요.",
-      fields: { email },
+      fields: { email, rememberLogin },
     };
   }
 
+  const cookieStore = await cookies();
+  cookieStore.set(
+    rememberLoginCookieName,
+    rememberLogin ? "1" : "0",
+    rememberLogin ? persistentPreferenceCookieOptions() : sessionPreferenceCookieOptions(),
+  );
+
   redirect("/");
 }
-

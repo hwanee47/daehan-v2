@@ -81,6 +81,17 @@ export function LoginForm() {
         )}
       </div>
 
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm" htmlFor="remember-login">
+        <input
+          className="size-5 shrink-0 rounded-sm border border-input accent-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
+          defaultChecked={state.fields?.rememberLogin ?? false}
+          id="remember-login"
+          name="rememberLogin"
+          type="checkbox"
+        />
+        <span>자동 로그인</span>
+      </label>
+
       {state.message && (
         <p aria-live="polite" className="rounded-2xl bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           {state.message}

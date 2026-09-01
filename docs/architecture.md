@@ -67,6 +67,7 @@ Client Component
 - Browser Client: `src/lib/supabase/client.ts`
 - Server Client: `src/lib/supabase/server.ts`
 - 인증 세션 갱신: `src/proxy.ts`
+- 자동 로그인 선택: 비밀번호를 저장하지 않고 `daehan-remember-login` HttpOnly 쿠키로 인증 쿠키의 세션/30일 유지 정책을 결정한다.
 - 파일 공통 동작: `src/lib/supabase/storage.ts`
 
 사용자 데이터 보호의 최종 경계는 Supabase RLS다. Client Component의 조건부 렌더링은 보안 정책을 대체하지 않는다. 스키마는 향후 `supabase/migrations`의 SQL migration으로 관리한다.

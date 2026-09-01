@@ -1,6 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { normalizeAuthCookieOptions, rememberLoginCookieName } from "@/lib/supabase/auth-cookies";
+
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -10,6 +12,7 @@ export async function proxy(request: NextRequest) {
   }
 
   let response = NextResponse.next({ request });
+  const rememberLogin = request.cookies.get(rememberLoginCookieName)?.value === "1";
 
   const supabase = createServerClient(url, publishableKey, {
     cookies: {
@@ -20,7 +23,7 @@ export async function proxy(request: NextRequest) {
         );
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options),
+          response.cookies.set(name, value, normalizeAuthCookieOptions(options, rememberLogin)),
         );
       },
     },
