@@ -7,7 +7,7 @@ import { useState } from "react";
 import type { InspectionItemOption } from "./types";
 
 function optionLabel(item: InspectionItemOption) {
-  return `${item.item_detail_code} · ${item.item_detail_name}`;
+  return `${item.model_name?.trim() || "기종 미입력"} · ${item.item_detail_name} (${item.item_detail_code})`;
 }
 
 function normalize(value: string) {
@@ -25,10 +25,6 @@ function matches(item: InspectionItemOption, query: string) {
     item.model_name,
     item.material,
   ].some((value) => value && normalize(value).includes(normalizedQuery));
-}
-
-function optionDescription(item: InspectionItemOption) {
-  return item.model_name?.trim() ?? "";
 }
 
 export function ItemDetailCombobox({
@@ -108,8 +104,11 @@ export function ItemDetailCombobox({
                     <Check aria-hidden="true" className="size-4" />
                   </Combobox.ItemIndicator>
                   <span className="min-w-0 whitespace-nowrap">
-                    <strong className="font-semibold">{optionLabel(item)}</strong>
-                    {optionDescription(item) ? <span className="ml-2 text-xs text-muted-foreground">· {optionDescription(item)}</span> : null}
+                    <strong className="font-semibold">
+                      <span className="text-primary">{item.model_name?.trim() || "기종 미입력"}</span>
+                      <span> · {item.item_detail_name}</span>
+                    </strong>
+                    <span> ({item.item_detail_code})</span>
                   </span>
                 </Combobox.Item>
               )}

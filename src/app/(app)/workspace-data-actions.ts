@@ -114,7 +114,7 @@ export async function loadInspectionHistoryWorkspace(): Promise<InspectionHistor
   }
   const [data, history] = await Promise.all([
     getInspectionReportData(),
-    searchMeasurementHistory({ dateFrom: "", dateTo: "", searchField: "", keyword: "", page: 1 }),
+    searchMeasurementHistory({ dateFrom: "", dateTo: "", searchField: "model", keyword: "", page: 1 }),
   ]);
   return { data, history };
 }

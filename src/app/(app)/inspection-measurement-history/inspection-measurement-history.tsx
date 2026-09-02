@@ -36,7 +36,7 @@ const modules = [AllCommunityModule];
 const emptyFilters = {
   dateFrom: "",
   dateTo: "",
-  searchField: "" as MeasurementHistorySearchField,
+  searchField: "model" as MeasurementHistorySearchField,
   keyword: "",
 };
 

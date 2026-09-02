@@ -16,6 +16,6 @@ export default async function InspectionMeasurementHistoryPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   const data = await getInspectionReportData();
-  const initialHistory = await searchMeasurementHistory({ dateFrom: "", dateTo: "", searchField: "", keyword: "", page: 1 });
+  const initialHistory = await searchMeasurementHistory({ dateFrom: "", dateTo: "", searchField: "model", keyword: "", page: 1 });
   return <main className="@container/workspace min-h-svh bg-background"><Container className="py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current="측정 이력" parent="검사성적서" /><section><InspectionMeasurementHistory data={data} initialHistory={initialHistory} /></section></Container></main>;
 }

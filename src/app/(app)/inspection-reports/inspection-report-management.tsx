@@ -52,6 +52,11 @@ function matchingTolerance(ranges: InspectionToleranceRange[], value: string) {
   return number === null ? null : ranges.find((range) => number > Number(range.nominal_min) && number <= Number(range.nominal_max)) ?? null;
 }
 
+function initialToleranceMode(item: InspectionReportDraftItem): "auto" | "manual" {
+  const values = [item.toleranceMin.trim(), item.toleranceMax.trim()];
+  return values.every((value) => !value || Number.isFinite(Number(value))) ? "auto" : "manual";
+}
+
 function Field({ children, className, label }: { children: React.ReactNode; className?: string; label: string }) {
   return <label className={cn("grid gap-2 text-sm font-semibold", className)}><span>{label}</span>{children}</label>;
 }
@@ -105,7 +110,7 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
     });
   }, [data.items, data.measurements, report]);
   const [rows, setRows] = useState<InspectionReportDraftItem[]>(initialItems);
-  const [toleranceModes, setToleranceModes] = useState<("auto" | "manual")[]>(() => initialItems.map(() => "auto"));
+  const [toleranceModes, setToleranceModes] = useState<("auto" | "manual")[]>(() => initialItems.map(initialToleranceMode));
   const [toleranceResult, setToleranceResult] = useState<InspectionToleranceRangeResult>({ ranges: [], error: null });
   const [isTolerancePending, startToleranceTransition] = useTransition();
   const selectedItem = data.itemOptions.find((item) => item.seq === Number(itemDetailSeq));
@@ -135,11 +140,6 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
       const result = await getInspectionToleranceRanges(seq);
       if (!cancelled) {
         setToleranceResult(result);
-        if (!result.error) setRows((current) => current.map((row) => {
-          if (row.toleranceMin.trim() || row.toleranceMax.trim()) return row;
-          const range = matchingTolerance(result.ranges, row.nominalDimension);
-          return range ? { ...row, toleranceMin: String(range.lower_deviation), toleranceMax: String(range.upper_deviation) } : row;
-        }));
       }
     });
     return () => { cancelled = true; };
@@ -213,7 +213,6 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
                       id="report-item-detail"
                       onValueChange={(next) => {
                         if (next !== itemDetailSeq) {
-                          setRows((current) => current.map((row, index) => ({ ...row, markerXRatio: null, markerYRatio: null, ...(toleranceModes[index] === "auto" ? { toleranceMin: "", toleranceMax: "" } : {}) })));
                           setToleranceResult({ ranges: [], error: null });
                         }
                         setItemDetailSeq(next);
@@ -352,7 +351,7 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
     <div className="grid min-h-[680px] gap-4 @min-[1024px]/workspace:h-[calc(100svh-250px)] @min-[1024px]/workspace:min-h-0 @min-[1024px]/workspace:grid-cols-[340px_minmax(0,1fr)] @min-[1280px]/workspace:grid-cols-[380px_minmax(0,1fr)]">
       <section aria-labelledby="report-list-title" className="flex min-h-0 min-w-0 flex-col overflow-hidden border-y border-border">
         <div className="flex min-h-14 items-center justify-between gap-3 bg-muted/70 px-3 py-2"><div><h2 className="font-semibold" id="report-list-title">성적서 목록</h2><span className="text-xs text-muted-foreground">{currentPage} / {totalPages} 페이지</span></div><Button onClick={openNew} size="sm" type="button"><FilePlus2 aria-hidden="true" />등록</Button></div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{visibleReports.length ? <div className="divide-y divide-border">{visibleReports.map((report) => { const selectedRow = selected?.seq === report.seq; return <button aria-pressed={selectedRow} className={cn("block min-h-[68px] w-full px-4 py-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", selectedRow && "bg-primary/10 hover:bg-primary/10")} key={report.seq} onClick={() => selectReport(report)} onDoubleClick={() => openEdit(report)} type="button"><span className="flex items-center justify-between gap-3"><strong className="truncate text-sm">{detailNameWithDrawing(report.item_detail_name, report.item_detail_code)}</strong><span className={cn("shrink-0 text-xs tabular-nums", selectedRow ? "font-semibold text-primary" : "text-muted-foreground")}>#{report.seq}</span></span><span className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground"><span className="truncate">{report.model_name} · {report.item_name}</span><span aria-hidden="true">·</span><span className="shrink-0">{itemCountByReport.get(report.seq) ?? 0}항목</span></span></button>; })}</div> : <p className="px-4 py-16 text-center text-sm text-muted-foreground">{data.reports.length ? "검색 결과가 없어요." : "등록된 검사성적서가 없어요."}</p>}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{visibleReports.length ? <div className="divide-y divide-border">{visibleReports.map((report) => { const selectedRow = selected?.seq === report.seq; return <button aria-pressed={selectedRow} className={cn("block min-h-[68px] w-full px-4 py-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", selectedRow && "bg-primary/10 hover:bg-primary/10")} key={report.seq} onClick={() => selectReport(report)} onDoubleClick={() => openEdit(report)} type="button"><span className="flex items-center justify-between gap-3"><strong className="min-w-0 truncate text-sm"><span className="text-primary">{report.model_name || "기종 미입력"}</span><span> · {detailNameWithDrawing(report.item_detail_name, report.item_detail_code)}</span></strong><span className={cn("shrink-0 text-xs tabular-nums", selectedRow ? "font-semibold text-primary" : "text-muted-foreground")}>#{report.seq}</span></span><span className="mt-1 block text-xs text-muted-foreground">{itemCountByReport.get(report.seq) ?? 0}항목</span></button>; })}</div> : <p className="px-4 py-16 text-center text-sm text-muted-foreground">{data.reports.length ? "검색 결과가 없어요." : "등록된 검사성적서가 없어요."}</p>}</div>
         <div className="flex min-h-14 items-center justify-between gap-2 border-t border-border px-3"><span className="text-xs text-muted-foreground">페이지당 최대 {pageResult.pageSize}건</span><div className="flex gap-2"><Button aria-label="이전 페이지" disabled={isSearching || currentPage <= 1} onClick={() => loadReports({ ...appliedQuery, page: currentPage - 1 })} size="sm" variant="secondary"><ChevronLeft aria-hidden="true" />이전</Button><Button aria-label="다음 페이지" disabled={isSearching || currentPage >= totalPages} onClick={() => loadReports({ ...appliedQuery, page: currentPage + 1 })} size="sm" variant="secondary">다음<ChevronRight aria-hidden="true" /></Button></div></div>
       </section>
       <section aria-labelledby="report-detail-title" className="flex min-h-0 min-w-0 flex-col overflow-hidden border-y border-border">
