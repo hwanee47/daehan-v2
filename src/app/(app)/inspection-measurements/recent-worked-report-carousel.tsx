@@ -89,9 +89,9 @@ export function RecentWorkedReportCarousel({
           <h2 className="font-semibold">최근 작업 성적서</h2>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">카드를 선택하면 빈 측정결과로 바로 시작해요.</p>
         </div>
-        <Button className="shrink-0" onClick={onOpenSearch} type="button" variant="outline">
+        <Button className="shrink-0" onClick={onOpenSearch} type="button">
           <FileSearch2 aria-hidden="true" />
-          다른 검사성적서 검색
+          검사성적서 불러오기
         </Button>
       </div>
 
