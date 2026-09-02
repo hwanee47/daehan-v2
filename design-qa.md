@@ -41,3 +41,56 @@
 5. P0/P1/P2 수정 후 재캡처
 
 final result: blocked
+
+---
+
+# Design QA — 최근 작업 검사성적서 카드 캐러셀
+
+- source visual truth path: `/Users/hwaneehwanee/.codex/generated_images/01a0361a-d3c4-7043-8d79-4db15e815dd8/exec-f41f9f36-dc0e-4feb-bfdf-41a90274776f.png`
+- implementation screenshot path: 없음 (인증 화면으로 리디렉션되어 캡처 불가)
+- viewport: 데스크톱 기본 in-app browser viewport
+- source pixels: 2087 × 754 (표시 과정에서 2048 × 740으로 축소됨)
+- implementation pixels / CSS size / density normalization: 확인 불가
+- state: 결과 입력 최초 진입, 최근 작업 성적서 Top 5 카드 레일
+
+## Full-view comparison evidence
+
+- 소스 시안은 열어 확인했다.
+- 구현 URL `http://127.0.0.1:3000/inspection-measurements`는 `/login`으로 리디렉션되어 동일 상태의 렌더링 증거를 확보하지 못했다.
+
+## Focused region comparison evidence
+
+- 인증 때문에 최근 작업 카드 영역이 렌더링되지 않아 집중 비교를 수행하지 못했다.
+
+## Findings
+
+- [P1] 인증으로 구현 화면 비교 불가
+  - 위치: 측정결과 입력 최초 화면
+  - 근거: 구현 URL 접근 시 로그인 화면으로 리디렉션됨
+  - 영향: 카드 폭, 겹침, 타이포그래피와 실제 드래그 동작을 시각적으로 확정할 수 없음
+  - 조치: 로그인된 세션에서 동일 화면을 열고 소스 시안과 같은 상태로 캡처한 뒤 비교
+
+## Required fidelity surfaces
+
+- Fonts and typography: 코드상 기존 Pretendard/font-sans와 디자인 시스템 크기를 사용했으나 렌더링 비교는 차단됨
+- Spacing and layout rhythm: workspace container query 기반으로 구현했으나 렌더링 비교는 차단됨
+- Colors and visual tokens: semantic token과 단일 primary 강조를 사용했으나 렌더링 비교는 차단됨
+- Image quality and asset fidelity: 별도 이미지 자산이 없는 UI이며 Lucide 기존 아이콘을 사용함
+- Copy and content: `검사성적서`, `기종`, `품명`, `품번/도번`, `최근 작업`만 카드에 유지함
+
+## Comparison history
+
+- 첫 비교: 로그인 리디렉션으로 P1 차단. 시각 수정 미실시.
+
+## Implementation checklist
+
+- 로그인된 상태에서 데스크톱 및 분할 패널 캡처
+- 마우스 드래그 후 카드 오클릭 방지 확인
+- 터치 스와이프와 스크롤 스냅 확인
+- 소스 시안과 카드 비율·간격·타이포그래피 재비교
+
+## Follow-up polish
+
+- 실제 데이터 길이에 따른 말줄임과 카드 겹침 정도를 렌더링 후 조정
+
+final result: blocked

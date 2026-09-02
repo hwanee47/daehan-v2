@@ -27,6 +27,7 @@ import {
 import type {
   CodesWorkspaceResult,
   InspectionHistoryWorkspaceResult,
+  InspectionMeasurementsWorkspaceResult,
   InspectionReportsWorkspaceResult,
   ItemsWorkspaceResult,
   ToleranceWorkspaceResult,
@@ -91,7 +92,7 @@ function InspectionReportsPanel({ isVisible }: { isVisible: boolean }) {
 
 function InspectionMeasurementsPanel({ isVisible }: { isVisible: boolean }) {
   const load = useCallback(() => loadInspectionMeasurementsWorkspace(), []);
-  const { result, loadError, setResult } = useVisibleLoad(isVisible, load);
+  const { result, loadError, setResult } = useVisibleLoad<InspectionMeasurementsWorkspaceResult>(isVisible, load);
   const measurementTargetSeq = useUiStore((state) => state.measurementTargetSeq);
   const measurementTargetRequestId = useUiStore((state) => state.measurementTargetRequestId);
   const handledTargetRequestId = useRef(0);
@@ -103,7 +104,7 @@ function InspectionMeasurementsPanel({ isVisible }: { isVisible: boolean }) {
       console.error("Failed to refresh measurement target", { message: error instanceof Error ? error.message : "Unknown error" });
     });
   }, [isVisible, load, measurementTargetRequestId, result, setResult]);
-  return <PanelFrame current="결과 입력" parent="검사성적서">{loadError ? <LoadState message={loadError} /> : !result ? <LoadState message="측정결과 입력 정보를 불러오는 중이에요" pending /> : <InspectionMeasurementSheet data={result} initialReportSeq={measurementTargetSeq ?? undefined} selectionRequestId={measurementTargetRequestId} showModeTabs={false} />}</PanelFrame>;
+  return <PanelFrame current="결과 입력" parent="검사성적서">{loadError ? <LoadState message={loadError} /> : !result ? <LoadState message="측정결과 입력 정보를 불러오는 중이에요" pending /> : <InspectionMeasurementSheet data={result.data} initialRecentWorked={result.recentWorked} initialReportSeq={measurementTargetSeq ?? undefined} selectionRequestId={measurementTargetRequestId} showModeTabs={false} />}</PanelFrame>;
 }
 
 function InspectionHistoryPanel({ isVisible }: { isVisible: boolean }) {

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 
 import { searchMeasurementHistory } from "./inspection-measurement-history/actions";
+import { getRecentWorkedReports, type RecentWorkedReportsResult } from "./inspection-measurements/actions";
 import { searchInspectionReports } from "./inspection-reports/actions";
 import { getInspectionReportData } from "./inspection-reports/data";
 import type { MeasurementHistoryPage } from "./inspection-measurement-history/types";
@@ -45,6 +46,11 @@ export type InspectionReportsWorkspaceResult = {
 export type InspectionHistoryWorkspaceResult = {
   data: InspectionReportData;
   history: MeasurementHistoryPage;
+};
+
+export type InspectionMeasurementsWorkspaceResult = {
+  data: InspectionReportData;
+  recentWorked: RecentWorkedReportsResult;
 };
 
 const emptyInspectionData: InspectionReportData = {
@@ -98,10 +104,11 @@ export async function loadInspectionReportsWorkspace(): Promise<InspectionReport
   return { data, page };
 }
 
-export async function loadInspectionMeasurementsWorkspace(): Promise<InspectionReportData> {
+export async function loadInspectionMeasurementsWorkspace(): Promise<InspectionMeasurementsWorkspaceResult> {
   const authorization = await getAuthorizedClient();
-  if (!authorization.supabase) return emptyInspectionData;
-  return getInspectionReportData();
+  if (!authorization.supabase) return { data: emptyInspectionData, recentWorked: { rows: [], error: authorization.error } };
+  const [data, recentWorked] = await Promise.all([getInspectionReportData(), getRecentWorkedReports()]);
+  return { data, recentWorked };
 }
 
 export async function loadInspectionHistoryWorkspace(): Promise<InspectionHistoryWorkspaceResult> {

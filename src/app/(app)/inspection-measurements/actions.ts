@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { itemImageBucket } from "@/lib/item-images";
+import { createSignedFileUrls } from "@/lib/supabase/storage";
 
 import type { InspectionMeasurementRunItem, InspectionReport } from "../inspection-reports/types";
 
@@ -19,7 +21,72 @@ export type RecentMeasurementHistoryResult = {
   error: string | null;
 };
 
+export type RecentWorkedReport = InspectionReport & {
+  lastWorkedAt: string;
+};
+
+export type RecentWorkedReportsResult = {
+  rows: RecentWorkedReport[];
+  error: string | null;
+};
+
 const runItemColumns = "seq, measurement_run_seq, source_report_item_seq, sort_order, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio, result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10, note";
+
+export async function getRecentWorkedReports(): Promise<RecentWorkedReportsResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { rows: [], error: "로그인이 필요해요." };
+
+  const latestByReport = new Map<number, string>();
+  const batchSize = 50;
+  for (let page = 0; page < 20 && latestByReport.size < 5; page += 1) {
+    const from = page * batchSize;
+    const { data: runs, error: runsError } = await supabase
+      .from("inspection_measurement_runs")
+      .select("inspection_report_seq, created_at")
+      .eq("is_deleted", false)
+      .order("created_at", { ascending: false })
+      .order("seq", { ascending: false })
+      .range(from, from + batchSize - 1);
+    if (runsError) {
+      console.error("Failed to load recent worked report runs", { code: runsError.code });
+      return { rows: [], error: "최근 작업 성적서를 불러오지 못했어요." };
+    }
+    for (const run of runs ?? []) {
+      if (!latestByReport.has(run.inspection_report_seq)) latestByReport.set(run.inspection_report_seq, run.created_at);
+      if (latestByReport.size >= 5) break;
+    }
+    if ((runs?.length ?? 0) < batchSize) break;
+  }
+
+  const reportSeqs = [...latestByReport.keys()];
+  if (reportSeqs.length === 0) return { rows: [], error: null };
+  const { data: reports, error: reportsError } = await supabase
+    .from("inspection_reports")
+    .select(reportColumns)
+    .in("seq", reportSeqs)
+    .eq("is_deleted", false);
+  if (reportsError) {
+    console.error("Failed to load recent worked reports", { code: reportsError.code });
+    return { rows: [], error: "최근 작업 성적서를 불러오지 못했어요." };
+  }
+
+  const reportRows = (reports ?? []) as Omit<InspectionReport, "image_url">[];
+  let signedUrls = new Map<string, string>();
+  try {
+    signedUrls = await createSignedFileUrls(supabase, itemImageBucket, reportRows.map((report) => report.image_path));
+  } catch (signError) {
+    console.error("Failed to sign recent worked report image URLs", { message: signError instanceof Error ? signError.message : "Unknown storage error" });
+  }
+  const reportsBySeq = new Map(reportRows.map((report) => [report.seq, report]));
+  return {
+    rows: reportSeqs.flatMap((seq) => {
+      const report = reportsBySeq.get(seq);
+      return report ? [{ ...report, image_url: report.image_path ? signedUrls.get(report.image_path) ?? null : null, lastWorkedAt: latestByReport.get(seq)! }] : [];
+    }),
+    error: null,
+  };
+}
 
 export async function searchMeasurementReports(keywordValue: string): Promise<{ rows: InspectionReport[]; error: string | null }> {
   const supabase = await createClient();

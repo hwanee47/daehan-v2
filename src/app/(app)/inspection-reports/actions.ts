@@ -6,7 +6,7 @@ import { itemImageBucket } from "@/lib/item-images";
 import { createClient } from "@/lib/supabase/server";
 import { createSignedFileUrls } from "@/lib/supabase/storage";
 
-import type { InspectionReport, InspectionReportActionState, InspectionReportDraftItem, InspectionReportPage, InspectionReportQuery, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
+import type { InspectionReport, InspectionReportActionState, InspectionReportDraftItem, InspectionReportItem, InspectionReportPage, InspectionReportQuery, InspectionToleranceRange, InspectionToleranceRangeResult } from "./types";
 
 const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
@@ -58,6 +58,24 @@ export async function searchInspectionReports(query: InspectionReportQuery): Pro
     pageSize: reportPageSize,
     error: null,
   };
+}
+
+export async function getInspectionReportItems(inspectionReportSeq: number): Promise<{ rows: InspectionReportItem[]; error: string | null }> {
+  if (!Number.isSafeInteger(inspectionReportSeq) || inspectionReportSeq <= 0) return { rows: [], error: "검사성적서를 확인해 주세요." };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { rows: [], error: "로그인이 필요해요." };
+
+  const { data, error } = await supabase
+    .from("inspection_report_items")
+    .select("seq, sort_order, inspection_report_seq, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio")
+    .eq("inspection_report_seq", inspectionReportSeq)
+    .order("sort_order");
+  if (error) {
+    console.error("Failed to refresh inspection report items", { code: error.code });
+    return { rows: [], error: "검사항목을 다시 불러오지 못했어요." };
+  }
+  return { rows: (data ?? []) as InspectionReportItem[], error: null };
 }
 
 function text(formData: FormData, key: string) {
@@ -412,7 +430,7 @@ export async function saveInspectionMeasurements(
   });
   const result = saveResult as { run_seq?: unknown; item_seqs?: unknown } | null;
   const runSeq = typeof result?.run_seq === "number" ? result.run_seq : null;
-  const itemSeqs = Array.isArray(result?.item_seqs) && result.item_seqs.every((seq) => typeof seq === "number") ? result.item_seqs : null;
+  const itemSeqs = Array.isArray(result?.item_seqs) && result.item_seqs.every((seq) => seq === null || typeof seq === "number") ? result.item_seqs as Array<number | null> : null;
   if (error || runSeq === null || !itemSeqs || itemSeqs.length !== rows.length) {
     console.error("Failed to save measurement run", { code: error?.code });
     return mutationError(error?.code === "23514" ? "제품구분 또는 신규 검사항목을 다시 확인해 주세요." : "측정결과 이력을 저장하지 못했어요. 다시 시도해 주세요.");

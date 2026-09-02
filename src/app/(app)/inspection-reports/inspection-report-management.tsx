@@ -14,7 +14,7 @@ import { useSaveFormShortcut } from "@/hooks/use-save-form-shortcut";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
-import { deleteInspectionReport, getInspectionToleranceRanges, saveInspectionReport, searchInspectionReports } from "./actions";
+import { deleteInspectionReport, getInspectionReportItems, getInspectionToleranceRanges, saveInspectionReport, searchInspectionReports } from "./actions";
 import { InspectionMarkerImage, type InspectionMarker } from "./inspection-marker-image";
 import { InspectionMarkerPositionDialog } from "./inspection-marker-position-dialog";
 import { ItemDetailCombobox } from "./item-detail-combobox";
@@ -295,11 +295,12 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
   const [appliedQuery, setAppliedQuery] = useState<InspectionReportQuery>({ searchField: "all", keyword: "", sortOrder: "newest", page: 1 });
   const [isSearching, startSearchTransition] = useTransition();
   const [detailTab, setDetailTab] = useState<"basic" | "inspection">("basic");
+  const [reportItems, setReportItems] = useState(data.items);
   const itemCountByReport = useMemo(() => {
     const counts = new Map<number, number>();
-    for (const item of data.items) counts.set(item.inspection_report_seq, (counts.get(item.inspection_report_seq) ?? 0) + 1);
+    for (const item of reportItems) counts.set(item.inspection_report_seq, (counts.get(item.inspection_report_seq) ?? 0) + 1);
     return counts;
-  }, [data.items]);
+  }, [reportItems]);
   const totalPages = Math.max(1, Math.ceil(pageResult.total / pageResult.pageSize));
   const currentPage = Math.min(pageResult.page, totalPages);
   const visibleReports = pageResult.rows;
@@ -313,7 +314,7 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
     item_name: selected.item_name,
     model_name: selected.model_name,
   } : null;
-  const selectedItems = selected ? data.items.filter((item) => item.inspection_report_seq === selected.seq) : [];
+  const selectedItems = selected ? reportItems.filter((item) => item.inspection_report_seq === selected.seq) : [];
   const selectedMarkers = selectedItems.flatMap((item) => item.marker_x_ratio === null || item.marker_y_ratio === null ? [] : [{ x: item.marker_x_ratio, y: item.marker_y_ratio, label: item.sort_order }]);
 
   function openNew() { setEditingReport(null); setEditorOpen(true); }
@@ -334,6 +335,12 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
   const refreshReports = useCallback((preferredSeq?: number) => {
     router.refresh();
     loadReports({ ...appliedQuery, page: 1 }, preferredSeq);
+    if (preferredSeq) {
+      void getInspectionReportItems(preferredSeq).then((result) => {
+        if (result.error) return;
+        setReportItems((current) => [...current.filter((item) => item.inspection_report_seq !== preferredSeq), ...result.rows]);
+      });
+    }
   }, [appliedQuery, loadReports, router]);
 
   if (data.hasError) return <div className="rounded-3xl border border-border bg-card p-6" role="alert"><h2 className="text-lg font-semibold">검사성적서를 불러오지 못했어요</h2><p className="mt-2 text-muted-foreground">잠시 후 다시 시도해 주세요.</p></div>;
@@ -368,7 +375,7 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
           </div>}</div></> : <div className="flex min-h-72 items-center justify-center p-6 text-center text-sm text-muted-foreground">왼쪽 목록에서 성적서를 선택해 주세요.</div>}
       </section>
     </div>
-    {editorOpen ? <ReportEditor data={data} key={`${editingReport?.seq ?? "new"}-${editorOpen}`} onOpenChange={setEditorOpen} onSaved={refreshReports} open={editorOpen} report={editingReport} /> : null}
+    {editorOpen ? <ReportEditor data={{ ...data, items: reportItems }} key={`${editingReport?.seq ?? "new"}-${editorOpen}`} onOpenChange={setEditorOpen} onSaved={refreshReports} open={editorOpen} report={editingReport} /> : null}
     {selected ? <DeleteReportDialog key={`${selected.seq}-${deleteOpen}`} onDeleted={refreshReports} onOpenChange={setDeleteOpen} open={deleteOpen} report={selected} /> : null}
     {detailFullscreen && selectedItem?.image_url ? <FullscreenImage label={selectedItem.item_detail_name} markers={selectedMarkers} onClose={() => setDetailFullscreen(false)} url={selectedItem.image_url} /> : null}
   </div>;
