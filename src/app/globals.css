@@ -182,11 +182,28 @@
 
 /* Tailwind의 방향별 border utility 조합에서도 성적서 내부 점선을 확실히 유지한다. */
 .inspection-print-sheet [class~="border-dashed"] {
-  border-style: dotted !important;
+  border-style: dashed !important;
 }
 
 .inspection-print-sheet [class~="border-b-dashed"] {
-  border-bottom-style: dotted !important;
+  border-bottom-width: 0.8px !important;
+  border-bottom-style: dashed !important;
+}
+
+.inspection-print-sheet [class~="border-dashed"][class~="border-t"] {
+  border-top-width: 0.8px !important;
+}
+
+.inspection-print-sheet [class~="border-dashed"][class~="border-r"] {
+  border-right-width: 0.8px !important;
+}
+
+.inspection-print-sheet [class~="border-dashed"][class~="border-b"] {
+  border-bottom-width: 0.8px !important;
+}
+
+.inspection-print-sheet [class~="border-dashed"][class~="border-l"] {
+  border-left-width: 0.8px !important;
 }
 
 .inspection-print-sheet > :not(.inspection-print-header) b,
@@ -253,6 +270,20 @@
   }
 
   body:has(.inspection-print-sheet) .inspection-print-hide {
+    display: none !important;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet input::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet input[type="date"] {
+    appearance: textfield;
+    -webkit-appearance: textfield;
+  }
+
+  body:has(.inspection-print-sheet) .inspection-print-sheet input[type="date"]::-webkit-calendar-picker-indicator {
     display: none !important;
   }
 

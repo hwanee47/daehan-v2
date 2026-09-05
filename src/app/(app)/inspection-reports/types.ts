@@ -23,7 +23,10 @@ export type InspectionReport = {
   product_type_name: string | null;
   hardness: string | null;
   heat_treatment: string | null;
+  special_notes: string | null;
   final_judgment_code_seq: number | null;
+  inspector_name: string | null;
+  inspection_date: string | null;
 };
 
 export type InspectionReportItem = {
@@ -80,6 +83,12 @@ export type InspectionMeasurementRun = {
   material: string | null;
   hardness: string | null;
   heat_treatment: string | null;
+  special_notes: string | null;
+  final_judgment_code_seq: number | null;
+  final_judgment_code: string | null;
+  final_judgment_name: string | null;
+  inspector_name: string | null;
+  inspection_date: string | null;
   image_path: string | null;
   image_url: string | null;
   created_at: string;

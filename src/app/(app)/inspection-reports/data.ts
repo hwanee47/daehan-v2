@@ -15,16 +15,26 @@ import type {
 
 export async function getInspectionReportData(): Promise<InspectionReportData> {
   const supabase = await createClient();
-  const [reportsResult, itemsResult, measurementsResult, detailsResult, codesResult] =
+  const finalJudgmentGroupResult = await supabase
+    .from("code_groups")
+    .select("seq")
+    .eq("group_code", "FINAL_JUDGMENT_STATUS")
+    .eq("is_active", true)
+    .maybeSingle();
+  const finalJudgmentGroupSeq = finalJudgmentGroupResult.data?.seq ?? null;
+  const [reportsResult, itemsResult, measurementsResult, detailsResult, codesResult, finalJudgmentCodesResult] =
     await Promise.all([
-      supabase.from("inspection_reports").select("seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq").eq("is_deleted", false).order("created_at", { ascending: false }).order("seq", { ascending: false }),
+      supabase.from("inspection_reports").select("seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, special_notes, final_judgment_code_seq, inspector_name, inspection_date").eq("is_deleted", false).order("created_at", { ascending: false }).order("seq", { ascending: false }),
       supabase.from("inspection_report_items").select("seq, sort_order, inspection_report_seq, nominal_dimension, tolerance_min, tolerance_max, marker_x_ratio, marker_y_ratio").order("inspection_report_seq").order("sort_order"),
       supabase.from("inspection_report_measurements").select("seq, inspection_report_seq, inspection_report_item_seq, result_1, result_2, result_3, result_4, result_5, result_6, result_7, result_8, result_9, result_10, note").order("inspection_report_seq").order("inspection_report_item_seq"),
       supabase.from("item_details").select("seq, item_detail_code, item_detail_name, material, image_path, items!inner(item_name, model_name)").order("item_detail_code"),
-      supabase.from("code_details").select("seq, code, code_name, code_groups!inner(group_code)").eq("is_active", true).in("code_groups.group_code", ["U0001", "U0002", "U0003", "FINAL_JUDGMENT_STATUS"]).order("sort_order").order("seq"),
+      supabase.from("code_details").select("seq, code, code_name, code_groups!inner(group_code)").eq("is_active", true).in("code_groups.group_code", ["U0001", "U0002", "U0003"]).order("sort_order").order("seq"),
+      finalJudgmentGroupSeq
+        ? supabase.from("code_details").select("seq, code, code_name").eq("code_group_seq", finalJudgmentGroupSeq).eq("is_active", true).in("code", ["PASS", "FAIL"]).order("sort_order").order("seq")
+        : Promise.resolve({ data: [], error: finalJudgmentGroupResult.error }),
     ]);
 
-  const errors = [reportsResult.error, itemsResult.error, measurementsResult.error, detailsResult.error, codesResult.error].filter(Boolean);
+  const errors = [reportsResult.error, itemsResult.error, measurementsResult.error, detailsResult.error, codesResult.error, finalJudgmentGroupResult.error, finalJudgmentCodesResult.error].filter(Boolean);
   if (errors.length) console.error("Failed to load inspection reports", { codes: errors.map((error) => error?.code) });
 
   const detailRows = (detailsResult.data ?? []) as unknown as Array<{
@@ -53,12 +63,18 @@ export async function getInspectionReportData(): Promise<InspectionReportData> {
       item_name: detail.items.item_name,
       model_name: detail.items.model_name,
     })),
-    codes: ((codesResult.data ?? []) as unknown as Array<{ seq: number; code: string; code_name: string; code_groups: { group_code: string } }>).map((code) => ({
-      seq: code.seq,
-      code: code.code,
-      code_name: code.code_name,
-      group_code: code.code_groups.group_code,
-    })) as InspectionCodeOption[],
+    codes: [
+      ...((codesResult.data ?? []) as unknown as Array<{ seq: number; code: string; code_name: string; code_groups: { group_code: string } }>).map((code) => ({
+        seq: code.seq,
+        code: code.code,
+        code_name: code.code_name,
+        group_code: code.code_groups.group_code,
+      })),
+      ...((finalJudgmentCodesResult.data ?? []) as Array<{ seq: number; code: string; code_name: string }>).map((code) => ({
+        ...code,
+        group_code: "FINAL_JUDGMENT_STATUS" as const,
+      })),
+    ] as InspectionCodeOption[],
     hasError: errors.length > 0,
   };
 }

@@ -12,7 +12,7 @@ const inspectionReportsPath = "/inspection-reports";
 const inspectionMeasurementsPath = "/inspection-measurements";
 const codeManagementPath = "/master/codes";
 const reportPageSize = 50;
-const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
+const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, special_notes, final_judgment_code_seq, inspector_name, inspection_date";
 const reportSearchColumns = { model: "model_name", drawing: "item_detail_code", itemName: "item_name", customer: "customer_name", supplier: "supplier_name" } as const;
 
 function safeSearchTerm(value: string) {
@@ -90,6 +90,12 @@ function positiveInteger(value: string) {
 
 function optionalPositiveInteger(value: string) {
   return value ? positiveInteger(value) : null;
+}
+
+function validDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function numeric(value: string) {
@@ -366,11 +372,19 @@ export async function saveInspectionMeasurements(
   const material = text(formData, "material");
   const hardness = text(formData, "hardness");
   const heatTreatment = text(formData, "heatTreatment");
+  const specialNotes = text(formData, "specialNotes");
+  const finalJudgmentCodeSeq = positiveInteger(text(formData, "finalJudgmentCodeSeq"));
+  const inspectorName = text(formData, "inspectorName");
+  const inspectionDate = text(formData, "inspectionDate");
   const rows = parsedRows?.filter((row) => row.seq || row.nominalDimension.trim() || toleranceText(row.toleranceMin) || toleranceText(row.toleranceMax) || row.results.some((result) => result.trim()) || row.note.trim());
-  if (!reportSeq || !rows || !eventType || productTypeCodeText && !productTypeCodeSeq) return mutationError("측정할 성적서와 제품구분, 결과를 확인해 주세요.");
+  if (!reportSeq || !rows || !eventType || productTypeCodeText && !productTypeCodeSeq || !finalJudgmentCodeSeq) return mutationError("측정할 성적서와 제품구분, 최종 판정, 결과를 확인해 주세요.");
   if (!modelName || !itemDetailName || !itemDetailCode || modelName.length > 100 || itemDetailName.length > 200 || itemDetailCode.length > 100 || customerName.length > 100 || supplierName.length > 100) return mutationError("성적서 기본정보를 다시 확인해 주세요.");
-  if (deliveryQuantityText.length > 100 || sampleCountText.length > 100 || deliveryDate.length > 100) return mutationError("납품수량, 시료수와 납품일자는 100자 이하로 입력해 주세요.");
+  if (deliveryQuantityText.length > 100 || sampleCountText.length > 100) return mutationError("납품수량과 시료수는 100자 이하로 입력해 주세요.");
+  if (deliveryDate && !validDate(deliveryDate)) return mutationError("납품일자를 다시 확인해 주세요.");
   if (material.length > 100 || hardness.length > 100 || heatTreatment.length > 100) return mutationError("재질, 경도와 열처리는 100자 이하로 입력해 주세요.");
+  if (specialNotes.length > 1000) return mutationError("특기사항은 1,000자 이하로 입력해 주세요.");
+  if (inspectorName.length > 100) return mutationError("검사자는 100자 이하로 입력해 주세요.");
+  if (inspectionDate && !validDate(inspectionDate)) return mutationError("검사일자를 다시 확인해 주세요.");
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
@@ -394,6 +408,8 @@ export async function saveInspectionMeasurements(
     const { data: productType, error: productTypeError } = await supabase.from("code_details").select("seq, code_groups!inner(group_code)").eq("seq", productTypeCodeSeq).eq("is_active", true).eq("code_groups.group_code", "U0002").maybeSingle();
     if (productTypeError || !productType) return mutationError("제품구분을 다시 선택해 주세요.");
   }
+  const { data: finalJudgment, error: finalJudgmentError } = await supabase.from("code_details").select("seq, code, code_groups!inner(group_code)").eq("seq", finalJudgmentCodeSeq).eq("is_active", true).in("code", ["PASS", "FAIL"]).eq("code_groups.group_code", "FINAL_JUDGMENT_STATUS").maybeSingle();
+  if (finalJudgmentError || !finalJudgment) return mutationError("최종 판정을 다시 선택해 주세요.");
   const results = rows.map((row) => row.results.map(optionalNumeric));
   if (rows.some((row) => row.note.length > 500)) {
     return mutationError("측정결과와 비고를 다시 확인해 주세요.");
@@ -426,6 +442,10 @@ export async function saveInspectionMeasurements(
     p_material: material,
     p_hardness: hardness,
     p_heat_treatment: heatTreatment,
+    p_special_notes: specialNotes,
+    p_final_judgment_code_seq: finalJudgmentCodeSeq,
+    p_inspector_name: inspectorName,
+    p_inspection_date: inspectionDate || null,
     p_rows: payload,
   });
   const result = saveResult as { run_seq?: unknown; item_seqs?: unknown } | null;

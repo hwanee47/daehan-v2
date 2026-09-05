@@ -2,7 +2,7 @@
 
 import { AlertDialog } from "@base-ui/react/alert-dialog";
 import { Dialog } from "@base-ui/react/dialog";
-import { CheckCircle2, Clock3, Expand, FileSearch2, Plus, Printer, RotateCcw, Save, Search, X } from "lucide-react";
+import { CalendarDays, Check, CheckCircle2, Clock3, Expand, FileSearch2, Plus, Printer, RotateCcw, Save, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
@@ -32,6 +32,9 @@ type ReportEditableFields = {
   material: string;
   hardness: string;
   heatTreatment: string;
+  specialNotes: string;
+  inspectorName: string;
+  inspectionDate: string;
 };
 
 const editableSheetFieldClass = "bg-blue-50/70 focus:bg-blue-100 disabled:bg-transparent print:bg-transparent";
@@ -40,10 +43,11 @@ function blankMeasurementItem(): InspectionReportDraftItem {
   return { nominalDimension: "", toleranceMin: "", toleranceMax: "", results: Array(10).fill(""), note: "", markerXRatio: null, markerYRatio: null };
 }
 
-function measurementSnapshot(rows: InspectionReportDraftItem[], fields: ReportEditableFields, productTypeCodeSeq: number | null) {
+function measurementSnapshot(rows: InspectionReportDraftItem[], fields: ReportEditableFields, productTypeCodeSeq: number | null, finalJudgmentCodeSeq: number | null) {
   return JSON.stringify({
     fields: Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value.trim()])),
     productTypeCodeSeq,
+    finalJudgmentCodeSeq,
     rows: rows
       .filter((row) => row.seq || row.nominalDimension.trim() || row.toleranceMin.trim() || row.toleranceMax.trim() || row.results.some((result) => result.trim()) || row.note.trim())
       .map((row) => ({
@@ -72,13 +76,69 @@ function submittedMeasurementSnapshot(formData: FormData) {
       material: String(formData.get("material") ?? ""),
       hardness: String(formData.get("hardness") ?? ""),
       heatTreatment: String(formData.get("heatTreatment") ?? ""),
-    }, productTypeValue ? Number(productTypeValue) : null);
+      specialNotes: String(formData.get("specialNotes") ?? ""),
+      inspectorName: String(formData.get("inspectorName") ?? ""),
+      inspectionDate: String(formData.get("inspectionDate") ?? ""),
+    }, productTypeValue ? Number(productTypeValue) : null, Number(formData.get("finalJudgmentCodeSeq")) || null);
   } catch {
     return null;
   }
 }
 
 function valueText(value: number | string | null | undefined) { return value === null || value === undefined ? "" : String(value); }
+
+function localDateInputValue(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
+}
+
+function normalizedDateInputValue(value: string | null | undefined) {
+  const match = value?.trim().match(/^(\d{4})[-./](\d{2})[-./](\d{2})$/);
+  if (!match) return "";
+  const normalized = `${match[1]}-${match[2]}-${match[3]}`;
+  const date = new Date(`${normalized}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === normalized ? normalized : "";
+}
+
+function formattedIsoDateInputValue(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
+function IsoDateField({ disabled, label, name, onChange, required = false, value }: { disabled: boolean; label: string; name: string; onChange: (value: string) => void; required?: boolean; value: string }) {
+  const pickerRef = useRef<HTMLInputElement>(null);
+
+  function openPicker() {
+    const picker = pickerRef.current;
+    if (!picker) return;
+    try {
+      picker.showPicker();
+    } catch {
+      picker.click();
+    }
+  }
+
+  return <div className="flex min-w-0 flex-1 items-center">
+    <input
+      aria-label={label}
+      className={cn("min-w-0 flex-1 px-1 text-[13px] tabular-nums outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100", editableSheetFieldClass)}
+      disabled={disabled}
+      inputMode="numeric"
+      maxLength={10}
+      name={name}
+      onChange={(event) => onChange(formattedIsoDateInputValue(event.target.value))}
+      pattern="\d{4}-\d{2}-\d{2}"
+      placeholder="YYYY-MM-DD"
+      required={required}
+      type="text"
+      value={value}
+    />
+    {!disabled ? <button aria-label={`${label} 캘린더 열기`} className="inspection-print-hide relative inline-flex size-8 shrink-0 items-center justify-center text-black outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600" onClick={openPicker} type="button"><CalendarDays aria-hidden="true" size={16} /></button> : null}
+    <input aria-hidden="true" className="pointer-events-none absolute size-px opacity-0" disabled={disabled} ref={pickerRef} tabIndex={-1} type="date" value={normalizedDateInputValue(value)} onChange={(event) => onChange(event.target.value)} />
+  </div>;
+}
 
 function signedTolerance(value: string) {
   const number = Number(value);
@@ -107,6 +167,7 @@ function MarkerFullscreenDialog({ label, markers, onClose, url }: { label: strin
 
 export function InspectionMeasurementSheet({ data, fillContainer = false, floatingPrintButton = false, initialRecentWorked, initialReportSeq, initialRunSeq = null, initialViewMode = "input", selectionRequestId = 0, showHistorySelector = true, showModeTabs = true, showReportList = true }: { data: InspectionReportData; fillContainer?: boolean; floatingPrintButton?: boolean; initialRecentWorked?: RecentWorkedReportsResult; initialReportSeq?: number; initialRunSeq?: number | null; initialViewMode?: "input" | "history"; selectionRequestId?: number; showHistorySelector?: boolean; showModeTabs?: boolean; showReportList?: boolean }) {
   const router = useRouter();
+  const [defaultInspectionDate] = useState(() => localDateInputValue());
   const [viewMode, setViewMode] = useState<"input" | "history">(initialViewMode);
   const [selectedSeq, setSelectedSeq] = useState<number | null>(initialReportSeq ?? null);
   const [pickerReports, setPickerReports] = useState(() => {
@@ -143,7 +204,8 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     item_detail_code: historyRun.item_detail_code, item_detail_name: historyRun.item_detail_name ?? historyRun.item_detail_code, material: historyRun.material, image_path: historyRun.image_path, image_url: historyRun.image_url, customer_name: historyRun.customer_name, supplier_name: historyRun.supplier_name,
     delivery_quantity: historyRun.delivery_quantity, sample_count: historyRun.sample_count, delivery_date: historyRun.delivery_date, delivery_quantity_text: historyRun.delivery_quantity_text, sample_count_text: historyRun.sample_count_text, delivery_date_text: historyRun.delivery_date_text, product_type_code_seq: historyRun.product_type_code_seq,
     product_type_code: historyRun.product_type_code, product_type_name: historyRun.product_type_name,
-    hardness: historyRun.hardness, heat_treatment: historyRun.heat_treatment, final_judgment_code_seq: null,
+    hardness: historyRun.hardness, heat_treatment: historyRun.heat_treatment, special_notes: historyRun.special_notes, final_judgment_code_seq: historyRun.final_judgment_code_seq,
+    inspector_name: historyRun.inspector_name, inspection_date: historyRun.inspection_date,
   } : isHistory ? null : currentReport;
   const reportItems = historyRun ? data.measurementRunItems.filter((item) => item.measurement_run_seq === historyRun.seq).map((item) => ({
     seq: item.source_report_item_seq ?? item.seq, sort_order: item.sort_order, inspection_report_seq: historyRun.inspection_report_seq,
@@ -158,6 +220,8 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const rows = isHistory ? initialRows : report ? rowsByReport[report.seq] ?? initialRows : [];
   const submittedRows = rows.filter((row) => row.seq || row.nominalDimension.trim() || row.toleranceMin.trim() || row.toleranceMax.trim() || row.results.some((result) => result.trim()) || row.note.trim());
   const [reportFieldsByReport, setReportFieldsByReport] = useState<Record<number, ReportEditableFields>>({});
+  const finalJudgmentCodes = data.codes.filter((code) => code.group_code === "FINAL_JUDGMENT_STATUS" && (code.code === "PASS" || code.code === "FAIL"));
+  const defaultPassCodeSeq = finalJudgmentCodes.find((code) => code.code === "PASS" || code.code_name.replaceAll(" ", "") === "합격")?.seq ?? null;
   const reportFields = report ? isHistory ? {
     modelName: report.model_name,
     itemDetailName: report.item_detail_name,
@@ -166,10 +230,13 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     supplierName: report.supplier_name ?? "",
     deliveryQuantity: report.delivery_quantity_text ?? valueText(report.delivery_quantity),
     sampleCount: report.sample_count_text ?? valueText(report.sample_count),
-    deliveryDate: report.delivery_date_text ?? report.delivery_date ?? "",
+    deliveryDate: normalizedDateInputValue(report.delivery_date_text ?? report.delivery_date),
     material: report.material ?? "",
     hardness: report.hardness ?? "",
     heatTreatment: report.heat_treatment ?? "",
+    specialNotes: report.special_notes ?? "",
+    inspectorName: report.inspector_name ?? "",
+    inspectionDate: normalizedDateInputValue(report.inspection_date),
   } : reportFieldsByReport[report.seq] ?? {
     modelName: report.model_name,
     itemDetailName: report.item_detail_name,
@@ -178,13 +245,18 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     supplierName: report.supplier_name ?? "",
     deliveryQuantity: report.delivery_quantity_text ?? valueText(report.delivery_quantity),
     sampleCount: report.sample_count_text ?? valueText(report.sample_count),
-    deliveryDate: report.delivery_date_text ?? report.delivery_date ?? "",
+    deliveryDate: normalizedDateInputValue(report.delivery_date_text ?? report.delivery_date),
     material: report.material ?? "",
     hardness: report.hardness ?? "",
     heatTreatment: report.heat_treatment ?? "",
-  } : { modelName: "", itemDetailName: "", itemDetailCode: "", customerName: "", supplierName: "", deliveryQuantity: "", sampleCount: "", deliveryDate: "", material: "", hardness: "", heatTreatment: "" };
+    specialNotes: report.special_notes ?? "",
+    inspectorName: report.inspector_name ?? "김현찬",
+    inspectionDate: normalizedDateInputValue(report.inspection_date) || defaultInspectionDate,
+  } : { modelName: "", itemDetailName: "", itemDetailCode: "", customerName: "", supplierName: "", deliveryQuantity: "", sampleCount: "", deliveryDate: "", material: "", hardness: "", heatTreatment: "", specialNotes: "", inspectorName: "김현찬", inspectionDate: defaultInspectionDate };
   const [productTypeByReport, setProductTypeByReport] = useState<Record<number, number | null>>({});
   const selectedProductTypeSeq = historyRun?.product_type_code_seq ?? (report ? report.seq in productTypeByReport ? productTypeByReport[report.seq] : report.product_type_code_seq : null);
+  const [finalJudgmentByReport, setFinalJudgmentByReport] = useState<Record<number, number | null>>({});
+  const selectedFinalJudgmentSeq = isHistory ? historyRun?.final_judgment_code_seq ?? null : report ? report.seq in finalJudgmentByReport ? finalJudgmentByReport[report.seq] : report.final_judgment_code_seq ?? defaultPassCodeSeq : null;
   const [fullscreen, setFullscreen] = useState(false);
   const [printDateTime, setPrintDateTime] = useState("");
   const [recentHistoryOpen, setRecentHistoryOpen] = useState(false);
@@ -220,8 +292,8 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const productCodes = data.codes.filter((code) => code.group_code === "U0002");
   const productName = report?.product_type_name ?? "";
   const markers = reportItems.flatMap((reportItem) => reportItem.marker_x_ratio === null || reportItem.marker_y_ratio === null ? [] : [{ x: reportItem.marker_x_ratio, y: reportItem.marker_y_ratio, label: reportItem.sort_order }]);
-  const currentSnapshot = report && !isHistory ? measurementSnapshot(rows, reportFields, selectedProductTypeSeq) : "";
-  const initialSnapshot = report && !isHistory ? measurementSnapshot(initialRows, { modelName: report.model_name, itemDetailName: report.item_detail_name, itemDetailCode: report.item_detail_code, customerName: report.customer_name ?? "", supplierName: report.supplier_name ?? "", deliveryQuantity: report.delivery_quantity_text ?? valueText(report.delivery_quantity), sampleCount: report.sample_count_text ?? valueText(report.sample_count), deliveryDate: report.delivery_date_text ?? report.delivery_date ?? "", material: report.material ?? "", hardness: report.hardness ?? "", heatTreatment: report.heat_treatment ?? "" }, report.product_type_code_seq) : "";
+  const currentSnapshot = report && !isHistory ? measurementSnapshot(rows, reportFields, selectedProductTypeSeq, selectedFinalJudgmentSeq) : "";
+  const initialSnapshot = report && !isHistory ? measurementSnapshot(initialRows, { modelName: report.model_name, itemDetailName: report.item_detail_name, itemDetailCode: report.item_detail_code, customerName: report.customer_name ?? "", supplierName: report.supplier_name ?? "", deliveryQuantity: report.delivery_quantity_text ?? valueText(report.delivery_quantity), sampleCount: report.sample_count_text ?? valueText(report.sample_count), deliveryDate: normalizedDateInputValue(report.delivery_date_text ?? report.delivery_date), material: report.material ?? "", hardness: report.hardness ?? "", heatTreatment: report.heat_treatment ?? "", specialNotes: report.special_notes ?? "", inspectorName: report.inspector_name ?? "김현찬", inspectionDate: normalizedDateInputValue(report.inspection_date) || defaultInspectionDate }, report.product_type_code_seq, report.final_judgment_code_seq ?? defaultPassCodeSeq) : "";
   const hasPrintChanges = Boolean(report && !isHistory && currentSnapshot !== (baselineByReport[report.seq] ?? initialSnapshot));
 
   function setRows(next: InspectionReportDraftItem[]) { if (report) setRowsByReport((current) => ({ ...current, [report.seq]: next })); }
@@ -264,6 +336,12 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
       return next;
     });
     setProductTypeByReport((current) => {
+      if (!(reportSeq in current)) return current;
+      const next = { ...current };
+      delete next[reportSeq];
+      return next;
+    });
+    setFinalJudgmentByReport((current) => {
       if (!(reportSeq in current)) return current;
       const next = { ...current };
       delete next[reportSeq];
@@ -414,7 +492,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   <div aria-labelledby={showModeTabs ? viewMode === "input" ? "measurement-input-tab" : "measurement-history-tab" : undefined} className={cn("min-h-[680px] min-w-0", fillContainer && "min-h-0 flex-1")} id={showModeTabs ? viewMode === "input" ? "measurement-input-panel" : "measurement-history-panel" : undefined} role={showModeTabs ? "tabpanel" : undefined}>
     <section aria-label={isHistory ? "측정 이력 조회" : "측정결과 입력"} className={cn("min-w-0", fillContainer && "h-full min-h-0")}>
     {!report ? isHistory ? <div className="flex min-h-72 flex-col items-center justify-center gap-4 border-y border-border p-10 text-center text-muted-foreground"><p>{reportRuns.length ? "조회할 회차를 선택해 주세요." : "저장 또는 인쇄 이력이 없어요."}</p></div> : showReportList ? <RecentWorkedReportCarousel error={recentWorkedError} isPending={isRecentWorkedPending} onOpenSearch={() => setReportPickerOpen(true)} onSelect={selectReport} reports={recentWorkedReports} /> : <div className="flex min-h-72 items-center justify-center border-y border-border p-10 text-center text-muted-foreground">측정할 검사성적서를 먼저 불러와 주세요.</div> : <form action={action} className={cn("inspection-measurement-form relative flex min-w-0 flex-col gap-3", fillContainer ? "h-full min-h-0" : "@min-[1024px]/workspace:h-[calc(100svh-150px)]")} id="inspection-measurement-form" onKeyDown={onSaveFormKeyDown}>
-      <input name="reportSeq" type="hidden" value={report.seq} /><input name="productTypeCodeSeq" type="hidden" value={selectedProductTypeSeq ?? ""} /><input name="items" type="hidden" value={JSON.stringify(submittedRows)} /><button className="hidden" data-save-submit="true" disabled={pending} name="eventType" type="submit" value="save">저장</button><button className="hidden" data-print-submit="true" disabled={pending} name="eventType" type="submit" value="print">인쇄 전 저장</button>
+      <input name="reportSeq" type="hidden" value={report.seq} /><input name="productTypeCodeSeq" type="hidden" value={selectedProductTypeSeq ?? ""} /><input name="finalJudgmentCodeSeq" type="hidden" value={selectedFinalJudgmentSeq ?? ""} /><input name="items" type="hidden" value={JSON.stringify(submittedRows)} /><button className="hidden" data-save-submit="true" disabled={pending} name="eventType" type="submit" value="save">저장</button><button className="hidden" data-print-submit="true" disabled={pending} name="eventType" type="submit" value="print">인쇄 전 저장</button>
       {isHistory && showHistorySelector ? <div className="inspection-print-hide flex flex-wrap items-center justify-end gap-2">
         <label className="text-sm font-medium" htmlFor="measurement-run">조회 회차</label>
         <div className="min-w-56">
@@ -443,7 +521,7 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
             {([['기종', 'modelName', 'text'], ['품명', 'itemDetailName', 'text'], ['품번/도번', 'itemDetailCode', 'text'], ['고객', 'customerName', 'text']] as const).map(([label, key, type]) => <label className="flex min-w-0 items-center border-r border-dashed border-black p-2 last:border-r-0" key={key}><b className="shrink-0">{label} :</b><input aria-label={label} className={cn("min-w-0 flex-1 px-1 text-[13px] outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100", editableSheetFieldClass)} disabled={isHistory} maxLength={key === 'itemDetailName' ? 200 : 100} name={key} type={type} value={reportFields[key]} onChange={(event) => updateReportField(key, event.target.value)} /></label>)}
           </div>
           <div className="grid grid-cols-4 border-x border-b border-b-dashed border-black">
-            {([['업체명', 'supplierName'], ['납품수량', 'deliveryQuantity'], ['시료수', 'sampleCount'], ['납품일자', 'deliveryDate']] as const).map(([label, key]) => <label className="flex min-w-0 items-center border-r border-dashed border-black p-2 last:border-r-0" key={key}><b className="shrink-0">{label} :</b><input aria-label={label} className={cn("min-w-0 flex-1 px-1 text-[13px] outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100", editableSheetFieldClass)} disabled={isHistory} maxLength={100} name={key} type="text" value={reportFields[key]} onChange={(event) => updateReportField(key, event.target.value)} /></label>)}
+            {([['업체명', 'supplierName'], ['납품수량', 'deliveryQuantity'], ['시료수', 'sampleCount'], ['납품일자', 'deliveryDate']] as const).map(([label, key]) => <label className="flex min-w-0 items-center border-r border-dashed border-black p-2 last:border-r-0" key={key}><b className="shrink-0">{label} :</b>{key === "deliveryDate" ? <IsoDateField disabled={isHistory} label={label} name={key} value={reportFields.deliveryDate} onChange={(value) => updateReportField("deliveryDate", value)} /> : <input aria-label={label} className={cn("min-w-0 flex-1 px-1 text-[13px] outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100", editableSheetFieldClass)} disabled={isHistory} maxLength={100} name={key} type="text" value={reportFields[key]} onChange={(event) => updateReportField(key, event.target.value)} />}</label>)}
           </div>
 	          <div aria-label="제품구분" className="flex h-9 items-center border-x border-b border-b-dashed border-black px-2 text-sm" role="group"><b className="inline-flex h-full shrink-0 items-center leading-none">제품구분 :</b><div className={cn("ml-6 flex h-full min-w-0 flex-1 items-center justify-start gap-8 print:ml-0 print:justify-center print:gap-12", !isHistory && "bg-blue-50/70 print:bg-transparent")}>{productCodes.map((code) => <label className="inline-flex h-full items-center gap-1.5 leading-none tracking-[0.12em]" key={code.seq}><input checked={code.seq === selectedProductTypeSeq} className="m-0 size-3.5 shrink-0 accent-black" disabled={isHistory} onChange={() => setProductTypeByReport((current) => ({ ...current, [report.seq]: selectedProductTypeSeq === code.seq ? null : code.seq }))} type="checkbox" />{code.code_name}</label>)}{productCodes.length === 0 || isHistory && selectedProductTypeSeq !== null && !productCodes.some((code) => code.seq === selectedProductTypeSeq) ? <span className="inline-flex h-full items-center leading-none tracking-[0.12em]">{historyRun?.product_type_name ?? productName}</span> : null}</div></div>
           <div className="relative h-[300px] overflow-hidden border-x border-b border-black"><p className="absolute left-2 top-2 z-20 bg-white/85 pr-2 font-semibold">약도</p>{item?.image_url ? <><div className="absolute inset-3 print:inset-[3mm]"><InspectionMarkerImage alt={`${item.item_detail_name} 도면 또는 제품 이미지`} markers={markers} printMarkerSize="fixed" url={item.image_url} /></div><button aria-label="순번이 표시된 이미지 전체 화면 보기" className="inspection-print-hide absolute right-3 top-1 z-20 inline-flex size-10 items-center justify-center border border-black bg-white" onClick={() => setFullscreen(true)} type="button"><Expand aria-hidden="true" size={18} /></button></> : null}</div>
@@ -465,9 +543,9 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
               })}</tbody>
             </table>
           <div className="inspection-result-columns grid min-h-24 border-x border-b border-black">
-            <div className="col-span-6 border-r border-dashed border-black p-2 font-semibold">* 특기사항</div>
+            <label className="col-span-6 flex min-w-0 flex-col border-r border-dashed border-black p-2 font-semibold"><span>* 특기사항</span><textarea aria-label="특기사항" className={cn("min-h-16 flex-1 resize-none p-1 text-[13px] font-normal outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100", editableSheetFieldClass)} disabled={isHistory} maxLength={1000} name="specialNotes" value={reportFields.specialNotes} onChange={(event) => updateReportField("specialNotes", event.target.value)} /></label>
             <div className="flex items-center justify-center border-r border-dashed border-black text-center font-semibold leading-snug">최종<br/>판정</div>
-            <div className="col-span-7 grid grid-rows-[2fr_1fr]"><div className="inspection-judgment-options flex items-center justify-center gap-16 border-b border-dashed border-black text-base font-semibold"><span>□ 합 격</span><span>□ 불 합 격</span></div><div className="grid grid-cols-2"><span className="flex items-center border-r border-dashed border-black p-2">검사자:</span><span className="flex items-center p-2">검사일자:</span></div></div>
+            <div className="col-span-7 grid grid-rows-[2fr_1fr]"><fieldset className="inspection-judgment-options flex items-center justify-center gap-16 border-b border-dashed border-black text-base font-semibold"><legend className="sr-only">최종 판정</legend>{finalJudgmentCodes.map((code) => { const selected = selectedFinalJudgmentSeq === code.seq; return <label className="inline-flex cursor-pointer items-center gap-2" key={code.seq}><input checked={selected} className="peer sr-only" disabled={isHistory} onChange={() => setFinalJudgmentByReport((current) => ({ ...current, [report.seq]: code.seq }))} type="radio" value={code.seq} /><span aria-hidden="true" className={cn("inline-flex size-5 shrink-0 items-center justify-center border border-black bg-white peer-focus-visible:ring-2 peer-focus-visible:ring-blue-600 peer-focus-visible:ring-offset-1 peer-disabled:opacity-100", selected && "bg-black")}><Check className={cn("size-4 text-white", !selected && "opacity-0")} strokeWidth={3} /></span>{code.code_name}</label>; })}{isHistory && finalJudgmentCodes.every((code) => code.seq !== selectedFinalJudgmentSeq) ? <span>{historyRun?.final_judgment_name ?? ""}</span> : null}</fieldset><div className="grid grid-cols-2"><label className="flex min-w-0 items-center border-r border-dashed border-black p-2"><b className="shrink-0">검사자:</b><input aria-label="검사자" className={cn("min-w-0 flex-1 px-1 outline-none focus:ring-2 focus:ring-inset focus:ring-blue-600 disabled:text-black disabled:opacity-100", editableSheetFieldClass)} disabled={isHistory} maxLength={100} name="inspectorName" value={reportFields.inspectorName} onChange={(event) => updateReportField("inspectorName", event.target.value)} /></label><label className="flex min-w-0 items-center p-2"><b className="shrink-0">검사일자:</b><IsoDateField disabled={isHistory} label="검사일자" name="inspectionDate" value={reportFields.inspectionDate} onChange={(value) => updateReportField("inspectionDate", value)} /></label></div></div>
           </div>
           <time className="inspection-print-datetime" dateTime={printDateTime}>{printDateTime}</time>
         </article>

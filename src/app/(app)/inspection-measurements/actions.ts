@@ -6,7 +6,7 @@ import { createSignedFileUrls } from "@/lib/supabase/storage";
 
 import type { InspectionMeasurementRunItem, InspectionReport } from "../inspection-reports/types";
 
-const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, final_judgment_code_seq";
+const reportColumns = "seq, model_name, item_seq, item_code, item_name, item_detail_seq, item_detail_code, item_detail_name, material, image_path, customer_name, supplier_name, delivery_quantity, sample_count, delivery_date, delivery_quantity_text, sample_count_text, delivery_date_text, product_type_code_seq, product_type_code, product_type_name, hardness, heat_treatment, special_notes, final_judgment_code_seq, inspector_name, inspection_date";
 
 export type RecentMeasurementRun = {
   seq: number;
