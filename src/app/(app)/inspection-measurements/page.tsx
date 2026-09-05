@@ -16,5 +16,5 @@ export default async function InspectionMeasurementsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
   const [data, recentWorked] = await Promise.all([getInspectionReportData(), getRecentWorkedReports()]);
-  return <main className="@container/workspace min-h-svh bg-background"><Container className="py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current="결과 입력" parent="검사성적서" /><section><InspectionMeasurementSheet data={data} initialRecentWorked={recentWorked} showModeTabs={false} /></section></Container></main>;
+  return <main className="@container/workspace flex h-full min-h-0 flex-col overflow-hidden bg-background"><Container className="flex h-full min-h-0 flex-col py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current="결과 입력" parent="검사성적서" /><section className="min-h-0 flex-1"><InspectionMeasurementSheet data={data} fillContainer initialRecentWorked={recentWorked} showModeTabs={false} /></section></Container></main>;
 }

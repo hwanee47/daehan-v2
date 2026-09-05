@@ -8,6 +8,7 @@ import { WorkspaceBreadcrumb } from "@/components/layout/workspace-breadcrumb";
 import { Button } from "@/components/ui/button";
 import { SearchConditions } from "@/components/ui/search-conditions";
 import type { AppTabHref } from "@/lib/app-tabs";
+import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
 import { InspectionReportManagement } from "./inspection-reports/inspection-report-management";
@@ -80,8 +81,8 @@ function useVisibleLoad<T>(isVisible: boolean, load: () => Promise<T>) {
   return { result, loadError, pending: isVisible && result === null && loadError === null, setResult };
 }
 
-function PanelFrame({ children, current, parent }: { children: React.ReactNode; current: string; parent: string }) {
-  return <main className="@container/workspace min-h-svh bg-background"><Container className="py-5 @min-[640px]/workspace:py-6" size="full"><WorkspaceBreadcrumb current={current} parent={parent} /><section>{children}</section></Container></main>;
+function PanelFrame({ children, current, fillContainer = false, parent }: { children: React.ReactNode; current: string; fillContainer?: boolean; parent: string }) {
+  return <main className={cn("@container/workspace bg-background", fillContainer ? "flex h-full min-h-0 flex-col overflow-hidden" : "min-h-svh")}><Container className={cn("py-5 @min-[640px]/workspace:py-6", fillContainer && "flex h-full min-h-0 flex-col")} size="full"><WorkspaceBreadcrumb current={current} parent={parent} /><section className={cn(fillContainer && "min-h-0 flex-1")}>{children}</section></Container></main>;
 }
 
 function InspectionReportsPanel({ isVisible }: { isVisible: boolean }) {
@@ -104,7 +105,7 @@ function InspectionMeasurementsPanel({ isVisible }: { isVisible: boolean }) {
       console.error("Failed to refresh measurement target", { message: error instanceof Error ? error.message : "Unknown error" });
     });
   }, [isVisible, load, measurementTargetRequestId, result, setResult]);
-  return <PanelFrame current="결과 입력" parent="검사성적서">{loadError ? <LoadState message={loadError} /> : !result ? <LoadState message="측정결과 입력 정보를 불러오는 중이에요" pending /> : <InspectionMeasurementSheet data={result.data} initialRecentWorked={result.recentWorked} initialReportSeq={measurementTargetSeq ?? undefined} selectionRequestId={measurementTargetRequestId} showModeTabs={false} />}</PanelFrame>;
+  return <PanelFrame current="결과 입력" fillContainer parent="검사성적서">{loadError ? <LoadState message={loadError} /> : !result ? <LoadState message="측정결과 입력 정보를 불러오는 중이에요" pending /> : <InspectionMeasurementSheet data={result.data} fillContainer initialRecentWorked={result.recentWorked} initialReportSeq={measurementTargetSeq ?? undefined} selectionRequestId={measurementTargetRequestId} showModeTabs={false} />}</PanelFrame>;
 }
 
 function InspectionHistoryPanel({ isVisible }: { isVisible: boolean }) {
