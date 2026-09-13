@@ -5,6 +5,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { CalendarDays, Check, CheckCircle2, Clock3, Expand, FileSearch2, Plus, Printer, RotateCcw, Save, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { flushSync } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -37,7 +38,37 @@ type ReportEditableFields = {
   inspectionDate: string;
 };
 
+type PrintDashLine = { x1: number; x2: number; y1: number; y2: number };
+type PrintDashGeometry = { height: number; lines: PrintDashLine[]; width: number };
+
 const editableSheetFieldClass = "bg-blue-50/70 focus:bg-blue-100 disabled:bg-transparent print:bg-transparent";
+
+function collectPrintDashGeometry(sheet: HTMLElement): PrintDashGeometry | null {
+  const sheetRect = sheet.getBoundingClientRect();
+  if (!sheetRect.width || !sheetRect.height) return null;
+
+  const lines = new Map<string, PrintDashLine>();
+  const addLine = (line: PrintDashLine) => {
+    const rounded = Object.values(line).map((value) => Math.round(value * 10) / 10);
+    lines.set(rounded.join(":"), line);
+  };
+
+  sheet.querySelectorAll<HTMLElement>('[class~="border-dashed"], [class~="border-b-dashed"]').forEach((element) => {
+    if (element.classList.contains("print:border-t-0")) return;
+    const rect = element.getBoundingClientRect();
+    const left = rect.left - sheetRect.left;
+    const right = rect.right - sheetRect.left;
+    const top = rect.top - sheetRect.top;
+    const bottom = rect.bottom - sheetRect.top;
+    if (element.classList.contains("border-b-dashed") || element.classList.contains("border-b")) addLine({ x1: left, x2: right, y1: bottom, y2: bottom });
+    if (!element.classList.contains("border-dashed")) return;
+    if (element.classList.contains("border-t")) addLine({ x1: left, x2: right, y1: top, y2: top });
+    if (element.classList.contains("border-r")) addLine({ x1: right, x2: right, y1: top, y2: bottom });
+    if (element.classList.contains("border-l")) addLine({ x1: left, x2: left, y1: top, y2: bottom });
+  });
+
+  return { height: sheetRect.height, lines: [...lines.values()], width: sheetRect.width };
+}
 
 function blankMeasurementItem(): InspectionReportDraftItem {
   return { nominalDimension: "", toleranceMin: "", toleranceMax: "", results: Array(10).fill(""), note: "", markerXRatio: null, markerYRatio: null };
@@ -259,6 +290,8 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const selectedFinalJudgmentSeq = isHistory ? historyRun?.final_judgment_code_seq ?? null : report ? report.seq in finalJudgmentByReport ? finalJudgmentByReport[report.seq] : report.final_judgment_code_seq ?? defaultPassCodeSeq : null;
   const [fullscreen, setFullscreen] = useState(false);
   const [printDateTime, setPrintDateTime] = useState("");
+  const [printDashGeometry, setPrintDashGeometry] = useState<PrintDashGeometry | null>(null);
+  const printSheetRef = useRef<HTMLElement>(null);
   const [recentHistoryOpen, setRecentHistoryOpen] = useState(false);
   const [recentHistory, setRecentHistory] = useState<RecentMeasurementHistoryResult>({ runs: [], error: null });
   const [pendingHistoryRun, setPendingHistoryRun] = useState<RecentMeasurementRun | null>(null);
@@ -295,6 +328,26 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
   const currentSnapshot = report && !isHistory ? measurementSnapshot(rows, reportFields, selectedProductTypeSeq, selectedFinalJudgmentSeq) : "";
   const initialSnapshot = report && !isHistory ? measurementSnapshot(initialRows, { modelName: report.model_name, itemDetailName: report.item_detail_name, itemDetailCode: report.item_detail_code, customerName: report.customer_name ?? "", supplierName: report.supplier_name ?? "", deliveryQuantity: report.delivery_quantity_text ?? valueText(report.delivery_quantity), sampleCount: report.sample_count_text ?? valueText(report.sample_count), deliveryDate: normalizedDateInputValue(report.delivery_date_text ?? report.delivery_date), material: report.material ?? "", hardness: report.hardness ?? "", heatTreatment: report.heat_treatment ?? "", specialNotes: report.special_notes ?? "", inspectorName: report.inspector_name ?? "김현찬", inspectionDate: normalizedDateInputValue(report.inspection_date) || defaultInspectionDate }, report.product_type_code_seq, report.final_judgment_code_seq ?? defaultPassCodeSeq) : "";
   const hasPrintChanges = Boolean(report && !isHistory && currentSnapshot !== (baselineByReport[report.seq] ?? initialSnapshot));
+
+  useEffect(() => {
+    const preparePrintDashOverlay = () => {
+      const sheet = printSheetRef.current;
+      if (!sheet) return;
+      const geometry = collectPrintDashGeometry(sheet);
+      flushSync(() => setPrintDashGeometry(geometry));
+    };
+    const clearPrintDashOverlay = () => {
+      document.body.classList.remove("inspection-print-preparing");
+      setPrintDashGeometry(null);
+    };
+    window.addEventListener("beforeprint", preparePrintDashOverlay);
+    window.addEventListener("afterprint", clearPrintDashOverlay);
+    return () => {
+      document.body.classList.remove("inspection-print-preparing");
+      window.removeEventListener("beforeprint", preparePrintDashOverlay);
+      window.removeEventListener("afterprint", clearPrintDashOverlay);
+    };
+  }, []);
 
   function setRows(next: InspectionReportDraftItem[]) { if (report) setRowsByReport((current) => ({ ...current, [report.seq]: next })); }
   function updateRow(rowIndex: number, update: Partial<InspectionReportDraftItem>) {
@@ -412,7 +465,10 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
     setSelectedRunSeq(mode === "history" ? data.measurementRuns.find((run) => run.inspection_report_seq === selectedSeq)?.seq ?? null : null);
   }
   function preparePrint() {
-    setPrintDateTime(new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "medium", hour12: false }).format(new Date()));
+    document.body.classList.add("inspection-print-preparing");
+    flushSync(() => setPrintDateTime(new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "medium", hour12: false }).format(new Date())));
+    const sheet = printSheetRef.current;
+    if (sheet) flushSync(() => setPrintDashGeometry(collectPrintDashGeometry(sheet)));
   }
   function openPrintDialog() {
     const originalTitle = document.title;
@@ -512,7 +568,10 @@ export function InspectionMeasurementSheet({ data, fillContainer = false, floati
       </div> : null}
       {!isHistory && state.message ? <p className={cn("inspection-print-hide shrink-0 border-y px-4 py-2.5 text-sm font-medium", state.status === "error" ? "border-destructive/20 bg-destructive/10 text-destructive" : "border-primary/20 bg-primary/10 text-primary")} role="status">{state.message}</p> : null}
       <div className="min-h-0 min-w-0 flex-1 overflow-auto border border-border bg-muted/25 p-2 @min-[768px]/workspace:p-4">
-        <article className="inspection-print-sheet w-full min-w-[980px] bg-white text-[13px] leading-tight text-black shadow-sm" aria-label="검사성적서 측정 양식">
+        <article className="inspection-print-sheet relative w-full min-w-[980px] bg-white text-[13px] leading-tight text-black shadow-sm" aria-label="검사성적서 측정 양식" ref={printSheetRef}>
+          {printDashGeometry ? <svg aria-hidden="true" className="inspection-print-dash-overlay pointer-events-none absolute inset-0 z-20 hidden size-full print:block" preserveAspectRatio="none" viewBox={`0 0 ${printDashGeometry.width} ${printDashGeometry.height}`}>
+            {printDashGeometry.lines.map((line, index) => <line key={`${line.x1}-${line.y1}-${line.x2}-${line.y2}-${index}`} stroke="#000" strokeDasharray="1.2mm 0.8mm" strokeWidth="0.15pt" vectorEffect="non-scaling-stroke" x1={line.x1} x2={line.x2} y1={line.y1} y2={line.y2} />)}
+          </svg> : null}
           <div className="inspection-print-header grid h-20 grid-cols-8 border-x border-t border-b border-b-dashed border-black">
             <h2 className="col-span-5 flex items-center justify-center text-3xl font-semibold tracking-[0.35em]">검 사 성 적 서</h2>
             <div className="col-span-3 grid grid-cols-3 border-l border-dashed border-black"><div className="grid grid-rows-[24px_1fr] border-r border-dashed border-black text-center"><span className="border-b border-dashed border-black py-1">작 성</span><span /></div><div className="grid grid-rows-[24px_1fr] border-r border-dashed border-black text-center"><span className="border-b border-dashed border-black py-1">검 토</span><span /></div><div className="grid grid-rows-[24px_1fr] text-center"><span className="border-b border-dashed border-black py-1">승 인</span><span /></div></div>

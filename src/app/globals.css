@@ -216,25 +216,68 @@
   font-weight: 600;
 }
 
+/* SVG 점선 좌표를 인쇄 레이아웃과 같은 크기에서 미리 계산한다. */
+body.inspection-print-preparing .inspection-print-sheet {
+  box-sizing: border-box;
+  width: 191mm;
+  min-width: 0;
+  padding: 10mm 7mm 4mm;
+}
+
+body.inspection-print-preparing .inspection-print-sheet table col:nth-child(1) {
+  width: 30px;
+}
+
+body.inspection-print-preparing .inspection-print-sheet table col:nth-child(2) {
+  width: 56px;
+}
+
+body.inspection-print-preparing .inspection-print-sheet table col:nth-child(3) {
+  width: 54px;
+}
+
+body.inspection-print-preparing .inspection-print-sheet table col:nth-child(14) {
+  width: 60px;
+}
+
+body.inspection-print-preparing .inspection-result-columns {
+  grid-template-columns: 30px 56px 54px repeat(10, minmax(0, 1fr)) 60px;
+}
+
+body.inspection-print-preparing .inspection-print-datetime {
+  display: block;
+  margin-top: 2mm;
+  text-align: right;
+  font-size: 8pt;
+}
+
+body.inspection-print-preparing .inspection-print-hide {
+  display: none !important;
+}
+
+body.inspection-print-preparing .inspection-print-sheet [class~="print:h-9"] {
+  height: 2.25rem;
+}
+
 @media print {
-  .inspection-print-sheet [class~="border-b-dashed"] {
-    border-bottom-color: #ccc !important;
+  .inspection-print-sheet:has(.inspection-print-dash-overlay) [class~="border-b-dashed"] {
+    border-bottom-color: transparent !important;
   }
 
-  .inspection-print-sheet [class~="border-dashed"][class~="border-t"] {
-    border-top-color: #ccc !important;
+  .inspection-print-sheet:has(.inspection-print-dash-overlay) [class~="border-dashed"][class~="border-t"] {
+    border-top-color: transparent !important;
   }
 
-  .inspection-print-sheet [class~="border-dashed"][class~="border-r"] {
-    border-right-color: #ccc !important;
+  .inspection-print-sheet:has(.inspection-print-dash-overlay) [class~="border-dashed"][class~="border-r"] {
+    border-right-color: transparent !important;
   }
 
-  .inspection-print-sheet [class~="border-dashed"][class~="border-b"] {
-    border-bottom-color: #ccc !important;
+  .inspection-print-sheet:has(.inspection-print-dash-overlay) [class~="border-dashed"][class~="border-b"] {
+    border-bottom-color: transparent !important;
   }
 
-  .inspection-print-sheet [class~="border-dashed"][class~="border-l"] {
-    border-left-color: #ccc !important;
+  .inspection-print-sheet:has(.inspection-print-dash-overlay) [class~="border-dashed"][class~="border-l"] {
+    border-left-color: transparent !important;
   }
 
   body:has(.inspection-print-sheet) * {
