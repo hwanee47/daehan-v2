@@ -186,24 +186,24 @@
 }
 
 .inspection-print-sheet [class~="border-b-dashed"] {
-  border-bottom-width: 0.8px !important;
+  border-bottom-width: 0.3px !important;
   border-bottom-style: dashed !important;
 }
 
 .inspection-print-sheet [class~="border-dashed"][class~="border-t"] {
-  border-top-width: 0.8px !important;
+  border-top-width: 0.3px !important;
 }
 
 .inspection-print-sheet [class~="border-dashed"][class~="border-r"] {
-  border-right-width: 0.8px !important;
+  border-right-width: 0.3px !important;
 }
 
 .inspection-print-sheet [class~="border-dashed"][class~="border-b"] {
-  border-bottom-width: 0.8px !important;
+  border-bottom-width: 0.3px !important;
 }
 
 .inspection-print-sheet [class~="border-dashed"][class~="border-l"] {
-  border-left-width: 0.8px !important;
+  border-left-width: 0.3px !important;
 }
 
 .inspection-print-sheet > :not(.inspection-print-header) b,
@@ -217,6 +217,26 @@
 }
 
 @media print {
+  .inspection-print-sheet [class~="border-b-dashed"] {
+    border-bottom-color: #ccc !important;
+  }
+
+  .inspection-print-sheet [class~="border-dashed"][class~="border-t"] {
+    border-top-color: #ccc !important;
+  }
+
+  .inspection-print-sheet [class~="border-dashed"][class~="border-r"] {
+    border-right-color: #ccc !important;
+  }
+
+  .inspection-print-sheet [class~="border-dashed"][class~="border-b"] {
+    border-bottom-color: #ccc !important;
+  }
+
+  .inspection-print-sheet [class~="border-dashed"][class~="border-l"] {
+    border-left-color: #ccc !important;
+  }
+
   body:has(.inspection-print-sheet) * {
     visibility: hidden !important;
   }
