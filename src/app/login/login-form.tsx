@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
+import Link from "next/link";
 import { LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,9 @@ export function LoginForm() {
         {pending && <LoaderCircle className="animate-spin" aria-hidden="true" />}
         {pending ? "로그인하고 있어요" : "로그인"}
       </Button>
+      <Link className="flex min-h-11 items-center justify-center rounded-xl text-sm text-muted-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href="/forgot-password">
+        비밀번호를 잊으셨나요?
+      </Link>
     </form>
   );
 }
