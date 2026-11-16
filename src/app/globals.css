@@ -199,6 +199,11 @@
   border-right-width: 0.3px !important;
 }
 
+.inspection-print-sheet .inspection-border-r-solid {
+  border-right-width: 0.3px !important;
+  border-right-style: solid !important;
+}
+
 .inspection-print-sheet .inspection-border-solid[class~="border-l"] {
   border-left-width: 0.3px !important;
 }
