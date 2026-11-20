@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 
 import { deleteInspectionReport, getInspectionReportItems, getInspectionToleranceRanges, saveInspectionReport, searchInspectionReports } from "./actions";
+import { defaultHeatTreatment, heatTreatmentText } from "./heat-treatment";
 import { InspectionMarkerImage, type InspectionMarker } from "./inspection-marker-image";
 import { InspectionMarkerPositionDialog } from "./inspection-marker-position-dialog";
 import { ItemDetailCombobox } from "./item-detail-combobox";
@@ -230,7 +231,7 @@ function ReportEditor({ data, onOpenChange, onSaved, open, report }: { data: Ins
                   <Field label="시료수"><input className={inputClass} max={10} min={1} name="sampleCount" type="number" value={sampleCount} onChange={(event) => setSampleCount(event.target.value)} /></Field>
                   <Field label="제품구분"><Select aria-label="제품구분" className="h-11" name="productTypeCodeSeq" onValueChange={setProductTypeCodeSeq} options={[{ label: "선택 안 함", value: "" }, ...productTypes.map((code) => ({ label: code.code_name, value: String(code.seq) }))]} value={productTypeCodeSeq} /></Field>
                   <Field label="경도"><input className={inputClass} defaultValue={report ? report.hardness ?? "" : "HrC 30~35"} maxLength={100} name="hardness" /></Field>
-                  <Field label="열처리"><input className={inputClass} defaultValue={report ? report.heat_treatment ?? "" : "Q.T/질화"} maxLength={100} name="heatTreatment" /></Field>
+                  <Field label="열처리"><input className={inputClass} defaultValue={report ? heatTreatmentText(report.heat_treatment) : defaultHeatTreatment} maxLength={100} name="heatTreatment" /></Field>
                 </div>
               </section>
 
@@ -368,7 +369,7 @@ export function InspectionReportManagement({ data, initialPage }: { data: Inspec
             ["기종", selected.model_name], ["품목코드", selected.item_code], ["품목상세코드", selected.item_detail_code], ["품명", selected.item_name], ["품목상세명", selected.item_detail_name], ["재질", selected.material ?? ""],
             ["고객명", selected.customer_name ?? ""], ["업체명", selected.supplier_name ?? ""], ["납품수량", selected.delivery_quantity?.toLocaleString() ?? ""],
             ["시료수", selected.sample_count ?? ""], ["제품구분", selected.product_type_name ?? ""],
-            ["경도", selected.hardness ?? ""], ["열처리", selected.heat_treatment ?? ""],
+            ["경도", selected.hardness ?? ""], ["열처리", heatTreatmentText(selected.heat_treatment)],
           ].map(([label, value]) => <div className="min-w-0 border-b border-border pb-3" key={label}><dt className="text-xs font-medium text-muted-foreground">{label}</dt><dd className={cn("mt-1.5 min-h-5 break-words text-sm", value ? "font-medium text-foreground" : "text-muted-foreground")}>{value || "미입력"}</dd></div>)}</dl> : <div className="grid gap-5 @min-[768px]/workspace:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.25fr)]">
             <div><h3 className="text-sm font-semibold">도면 / 제품 이미지</h3><div className="relative mt-3 flex h-64 items-center justify-center overflow-hidden bg-muted/30">{selectedItem?.image_url ? <><InspectionMarkerImage alt={`${selectedItem.item_detail_name} 이미지`} markers={selectedMarkers} url={selectedItem.image_url} /><button aria-label="이미지 전체 화면 보기" className="absolute right-3 top-3 z-20 inline-flex size-11 items-center justify-center rounded-full bg-background shadow" onClick={() => setDetailFullscreen(true)} type="button"><Expand aria-hidden="true" /></button></> : <p className="px-5 text-center text-sm text-muted-foreground">품목상세에 등록된 이미지가 없어요.</p>}</div></div>
             <div className="min-w-0"><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold">검사항목</h3><span className="text-xs text-muted-foreground">{selectedItems.length}개</span></div><div className="mt-3 max-h-64 overflow-auto border-y border-border"><table className="w-full min-w-[430px] border-collapse text-sm"><thead className="sticky top-0 z-10 bg-muted"><tr><th className="w-16 px-3 py-3 text-center">순번</th><th className="px-3 py-3 text-right">기준치수</th><th className="px-3 py-3 text-right">공차 min</th><th className="px-3 py-3 text-right">공차 max</th></tr></thead><tbody>{selectedItems.length ? selectedItems.map((item) => <tr className="border-t border-border bg-background" key={item.seq}><td className="px-3 py-2.5 text-center tabular-nums">{item.sort_order}</td><td className="px-3 py-2.5 text-right tabular-nums">{numberText(item.nominal_dimension)}</td><td className="px-3 py-2.5 text-right tabular-nums">{numberText(item.tolerance_min)}</td><td className="px-3 py-2.5 text-right tabular-nums">{numberText(item.tolerance_max)}</td></tr>) : <tr><td className="px-4 py-12 text-center text-muted-foreground" colSpan={4}>등록된 검사항목이 없어요.</td></tr>}</tbody></table></div></div>
