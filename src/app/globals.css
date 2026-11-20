@@ -180,32 +180,52 @@
   font-size: 12px;
 }
 
-/* 입력 셀 외 내부 구분선은 바깥 테두리(1px)보다 얇게 표시한다. */
+/* 표 내부 선이나 인쇄 점선 SVG보다 외곽 테두리를 위에 그린다. */
+.inspection-sheet-frame {
+  position: relative;
+}
+
+.inspection-sheet-frame::after {
+  position: absolute;
+  z-index: 30;
+  inset: 0;
+  box-sizing: border-box;
+  border: 1px solid #000;
+  pointer-events: none;
+  content: "";
+}
+
+/* 화면의 최소 픽셀 두께에서도 내부선이 가늘게 보이도록 농도를 낮춘다. */
 .inspection-print-sheet .inspection-border-solid {
   border-style: solid !important;
 }
 
 .inspection-print-sheet .inspection-border-b-solid,
 .inspection-print-sheet .inspection-border-solid[class~="border-b"] {
-  border-bottom-width: 0.3px !important;
+  border-bottom-width: 0.05px !important;
+  border-bottom-color: var(--inspection-solid-border-color, rgb(0 0 0 / 20%)) !important;
   border-bottom-style: solid !important;
 }
 
 .inspection-print-sheet .inspection-border-solid[class~="border-t"] {
-  border-top-width: 0.3px !important;
+  border-top-width: 0.05px !important;
+  border-top-color: var(--inspection-solid-border-color, rgb(0 0 0 / 20%)) !important;
 }
 
 .inspection-print-sheet .inspection-border-solid[class~="border-r"] {
-  border-right-width: 0.3px !important;
+  border-right-width: 0.05px !important;
+  border-right-color: var(--inspection-solid-border-color, rgb(0 0 0 / 20%)) !important;
 }
 
 .inspection-print-sheet .inspection-border-r-solid {
-  border-right-width: 0.3px !important;
+  border-right-width: 0.05px !important;
+  border-right-color: var(--inspection-solid-border-color, rgb(0 0 0 / 20%)) !important;
   border-right-style: solid !important;
 }
 
 .inspection-print-sheet .inspection-border-solid[class~="border-l"] {
-  border-left-width: 0.3px !important;
+  border-left-width: 0.05px !important;
+  border-left-color: var(--inspection-solid-border-color, rgb(0 0 0 / 20%)) !important;
 }
 
 /* Tailwind의 방향별 border utility 조합에서도 성적서 내부 점선을 확실히 유지한다. */
@@ -234,13 +254,13 @@
   border-left-width: 0.3px !important;
 }
 
-.inspection-print-sheet > :not(.inspection-print-header) b,
-.inspection-print-sheet > :not(.inspection-print-header) th,
-.inspection-print-sheet > :not(.inspection-print-header) .font-semibold {
+.inspection-print-sheet > .inspection-sheet-frame > :not(.inspection-print-header) b,
+.inspection-print-sheet > .inspection-sheet-frame > :not(.inspection-print-header) th,
+.inspection-print-sheet > .inspection-sheet-frame > :not(.inspection-print-header) .font-semibold {
   font-weight: 400;
 }
 
-.inspection-print-sheet > :not(.inspection-print-header) .inspection-judgment-options {
+.inspection-print-sheet > .inspection-sheet-frame > :not(.inspection-print-header) .inspection-judgment-options {
   font-weight: 600;
 }
 
@@ -288,6 +308,11 @@ body.inspection-print-preparing .inspection-print-sheet [class~="print:h-9"] {
 }
 
 @media print {
+  /* 인쇄에서도 최소 선 두께 보정으로 외곽선만큼 진해지지 않게 농도를 유지한다. */
+  .inspection-print-sheet {
+    --inspection-solid-border-color: rgb(0 0 0 / 20%);
+  }
+
   .inspection-print-sheet:has(.inspection-print-dash-overlay) [class~="border-b-dashed"] {
     border-bottom-color: transparent !important;
   }
